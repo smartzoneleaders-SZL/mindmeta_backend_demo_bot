@@ -82,6 +82,9 @@ def tts_service(text, message_queue,audio):
     except Exception as e:
         print(f"Error in TTS service: {e}")
 
+@app.get("/")
+def check_me():
+    return {"message":"Done"}
 
 
 @app.websocket("/ws")
