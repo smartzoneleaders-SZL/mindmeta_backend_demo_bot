@@ -85,7 +85,7 @@ def tts_service(text, message_queue,audio):
 
 
 @app.websocket("/ws")
-async def websocket_endpoint(websocket: WebSocket, voice:str):
+async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
     #print("Started receiving")
 
@@ -108,7 +108,7 @@ async def websocket_endpoint(websocket: WebSocket, voice:str):
                 cleaned_llm_response = remove_thinking(llm_response)
 
                 # Send text to TTS service for conversion to speech
-                tts_service(cleaned_llm_response, message_queue, voice)
+                tts_service(cleaned_llm_response, message_queue, "f")
 
         def on_error(self, error, **kwargs):
             print(f"Error: {error}")
