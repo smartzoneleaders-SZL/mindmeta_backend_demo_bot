@@ -12,6 +12,9 @@ from services.Langchain_service import chat_prompt, HumanMessage, model
 # For running main.py 
 import uvicorn
 
+# For middleware
+from fastapi.middleware.cors import CORSMiddleware
+
 
 # For parsers
 from utils.parsers.parsers_for_llm import remove_thinking
@@ -21,6 +24,15 @@ from utils.parsers.parsers_for_llm import remove_thinking
 load_dotenv()
 
 app = FastAPI()
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 
 # Initialize Deepgram client with API key from environment variable
 api_key = os.getenv("DEEPGRAM_API_KEY")
