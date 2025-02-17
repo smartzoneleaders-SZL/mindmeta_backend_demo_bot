@@ -1,2 +1,5 @@
 venv
 services/__pycache__
+utils/__pycache__
+
+/utils/parsers/__pycache__
