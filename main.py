@@ -11,6 +11,9 @@ from services.Langchain_service import chat_prompt, HumanMessage, model
 # For running main.py 
 import uvicorn
 
+# from datetime
+from datetime import datetime
+
 # From openai
 from services.openai_service import system_prompt, client
 
@@ -48,9 +51,11 @@ async def invoke_model(input):
     )
     message = data.choices[0].message
     # print("Model response in invoke_model is: ", message.content)
+    print("Request arrived at:", datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
     return message.content 
 
 async def async_tts_service(text, message_queue, audio):
+    print("Going to so tts for: ",text)
     voice = 'aura-athena-en'
     if audio == 'm':
         voice = 'aura-helios-en'
@@ -75,6 +80,7 @@ async def async_tts_service(text, message_queue, audio):
                 audio_data = await response.read()
                 audio_base64 = base64.b64encode(audio_data).decode("utf-8")
                 message = json.dumps({"audio": audio_base64, "complete": True})
+                print("going to send the TTS back to frontend:", datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
                 await message_queue.put(message)
 
         except Exception as e:
@@ -90,12 +96,14 @@ async def websocket_endpoint(websocket: WebSocket):
     loop = asyncio.get_running_loop()  # Get reference to main event loop
 
     try:
+        send_task = None
         dg_connection = deepgram_client.listen.live.v("1")
         message_queue = asyncio.Queue()
-
+        print("Received the request at:", datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
         async def process_llm_response(sentence):
             try:
                 llm_response = await invoke_model(sentence)
+
                 # print("LLM response is: ", llm_response)
                 await async_tts_service(llm_response, message_queue, "f")
             except Exception as e:
@@ -104,6 +112,10 @@ async def websocket_endpoint(websocket: WebSocket):
         def on_message(self, result, **kwargs):
             sentence = result.channel.alternatives[0].transcript
             if result.speech_final and sentence.strip():
+                msg_to_send= "hmmmm"
+                print("before async hmmmm")
+                print("STT done at:", datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+                asyncio.run_coroutine_threadsafe(async_tts_service(msg_to_send,message_queue,"f"),loop)
                 # print(f"Final transcription: {sentence}")
                 # Schedule in main event loop
                 asyncio.run_coroutine_threadsafe(
@@ -114,7 +126,7 @@ async def websocket_endpoint(websocket: WebSocket):
         def on_error(self, error, **kwargs):
             print(f"Deepgram error: {error}")
 
-        def on_close(self, *args, **kwargs):  # Updated signature
+        def on_close(self, *args, **kwargs):  
             print("Deepgram connection closed")
 
         dg_connection.on(LiveTranscriptionEvents.Transcript, on_message)
@@ -150,12 +162,13 @@ async def websocket_endpoint(websocket: WebSocket):
         print(f"WebSocket error: {e}")
     finally:
         dg_connection.finish()
-        send_task.cancel()
+        if send_task is not None:
+            send_task.cancel()
     try:
         await websocket.close()
     except RuntimeError:
         print("WebSocket already closed.")
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=80)
+    uvicorn.run(app, host="0.0.0.0", port=8000)
 
