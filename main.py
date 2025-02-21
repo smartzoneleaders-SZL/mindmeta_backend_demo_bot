@@ -20,8 +20,7 @@ from services.openai_service import system_prompt, client
 # For middleware
 from fastapi.middleware.cors import CORSMiddleware
 
-# For parsers
-from utils.parsers.parsers_for_llm import remove_thinking
+
 
 load_dotenv()
 
@@ -47,15 +46,12 @@ async def invoke_model(input):
     # print("Chat completion before")
     # print("System prompt is: ",system_prompt)
     data = await client.chat.completions.create(
-    model="gpt-4o", messages=system_prompt
+    model="gpt-3.5-turbo-0125", messages=system_prompt
     )
     message = data.choices[0].message
-    # print("Model response in invoke_model is: ", message.content)
-    print("Request arrived at:", datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
     return message.content 
 
 async def async_tts_service(text, message_queue, audio):
-    print("Going to so tts for: ",text)
     voice = 'aura-athena-en'
     if audio == 'm':
         voice = 'aura-helios-en'
@@ -99,12 +95,9 @@ async def websocket_endpoint(websocket: WebSocket):
         send_task = None
         dg_connection = deepgram_client.listen.live.v("1")
         message_queue = asyncio.Queue()
-        print("Received the request at:", datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
         async def process_llm_response(sentence):
             try:
                 llm_response = await invoke_model(sentence)
-
-                # print("LLM response is: ", llm_response)
                 await async_tts_service(llm_response, message_queue, "f")
             except Exception as e:
                 print(f"Processing error: {e}")
@@ -112,12 +105,7 @@ async def websocket_endpoint(websocket: WebSocket):
         def on_message(self, result, **kwargs):
             sentence = result.channel.alternatives[0].transcript
             if result.speech_final and sentence.strip():
-                msg_to_send= "hmmmm"
-                print("before async hmmmm")
                 print("STT done at:", datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-                asyncio.run_coroutine_threadsafe(async_tts_service(msg_to_send,message_queue,"f"),loop)
-                # print(f"Final transcription: {sentence}")
-                # Schedule in main event loop
                 asyncio.run_coroutine_threadsafe(
                     process_llm_response(sentence),
                     loop
