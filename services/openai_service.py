@@ -2,7 +2,7 @@ from openai import AsyncOpenAI
 
 import os
 
-import datetime
+from datetime import datetime
 
 # Initialize the async client
 client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
