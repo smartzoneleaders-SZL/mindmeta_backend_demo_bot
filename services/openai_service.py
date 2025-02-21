@@ -68,7 +68,6 @@ Feedback & Learning: End sessions with feedback requests; use caregiver notes to
 
         Response Rules:
         . Only answer using their data provided above
-        . Keep responses under 20 words and be concise
         . Ask for clarification if a question is ambiguous
         . Do not speculate or use external knowledge
         """
