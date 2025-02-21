@@ -2,7 +2,7 @@
 # More GitHub Actions for Azure: https://github.com/Azure/actions
 # More info on Python, GitHub Actions, and Azure App Service: https://aka.ms/python-webapps-actions
 
-name: Build and deploy Python app to Azure Web App - mindmeta-backend
+name: Build and deploy Python app to Azure Web App - mindmeta-backend-dev
 
 on:
   push:
@@ -68,14 +68,14 @@ jobs:
       - name: Login to Azure
         uses: azure/login@v2
         with:
-          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_D1DD06E059B04D4C902B31A57DFF3D2F }}
-          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_E103161D206143C88C08C2084B0C22AB }}
-          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_9881DF8FC62F4FC3B8B1A2DED057DC11 }}
+          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_38E823DA7919459E8FD69BF7409398FE }}
+          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_709AAC3713924EC7A48A91D258E924B0 }}
+          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_8FE8A5879A6848A6A55B10DC7C7AB5C8 }}
 
       - name: 'Deploy to Azure Web App'
         uses: azure/webapps-deploy@v3
         id: deploy-to-webapp
         with:
-          app-name: 'mindmeta-backend'
+          app-name: 'mindmeta-backend-dev'
           slot-name: 'Production'
           
