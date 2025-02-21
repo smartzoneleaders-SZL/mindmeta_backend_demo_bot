@@ -67,11 +67,10 @@ Feedback & Learning: End sessions with feedback requests; use caregiver notes to
     life history and details of patient are :    {life_history}
 
         Response Rules:
-        2. Only answer using their data provided above
-        3. Reply "I am unaware of that information" for questions outside this scope
-        4. Keep responses under 20 words and be concise
-        5. Ask for clarification if a question is ambiguous
-        6. Do not speculate or use external knowledge
+        . Only answer using their data provided above
+        . Keep responses under 20 words and be concise
+        . Ask for clarification if a question is ambiguous
+        . Do not speculate or use external knowledge
         """
 
 
