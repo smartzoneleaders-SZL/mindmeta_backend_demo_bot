@@ -78,4 +78,11 @@ jobs:
         with:
           app-name: 'mindmeta-backend-dev'
           slot-name: 'Production'
+
+      - name: Send Slack Notification
+        if: success()
+        run: |
+          curl -X POST -H 'Content-type: application/json' \
+            --data '{"text": "🚀 MindMeta AI Backend is LIVE! Our cutting-edge mindmeta-backend has been successfully deployed to Azure Production. Let’s innovate and shape the future of AI!"}' \
+            ${{ secrets.SLACK_WEBHOOK_URL }}
           
