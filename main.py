@@ -1,4 +1,4 @@
-import aiohttp  
+import requests  
 import base64
 import json
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
@@ -6,7 +6,7 @@ from deepgram import DeepgramClient, LiveTranscriptionEvents, LiveOptions
 import asyncio
 import os
 from dotenv import load_dotenv
-from services.Langchain_service import chat_prompt, HumanMessage, model
+from services.Langchain_service import chat_with_model
 
 # For running main.py 
 import uvicorn
@@ -40,47 +40,53 @@ if not api_key:
     raise ValueError("Deepgram API Key is missing.")
 deepgram_client = DeepgramClient(api_key)
 
-async def invoke_model(input):
-    # print("Entered invoke function")
-    system_prompt.append({'role': "user", "content": input})
-    # print("Chat completion before")
-    # print("System prompt is: ",system_prompt)
-    data = await client.chat.completions.create(
-    model="gpt-3.5-turbo-0125", messages=system_prompt
-    )
-    message = data.choices[0].message
-    return message.content 
+def invoke_model(input):
+    input_data = {"messages": [{"role": "user", "content": input}]}
+    config = {"configurable": {"thread_id": 'abc123'}}
+    response = chat_with_model.invoke(input_data, config=config)
+    return response["messages"][-1].content
 
-async def async_tts_service(text, message_queue, audio):
+def async_tts_service(text, message_queue, audio):
+    print("LLM responded at: ", datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
     voice = 'aura-athena-en'
     if audio == 'm':
         voice = 'aura-helios-en'
-    
-    DEEPGRAM_URL = f"https://api.deepgram.com/v1/speak?model={voice}"
-    DEEPGRAM_API_KEY = os.getenv("DEEPGRAM_API_KEY")
+    try:
+        DEEPGRAM_URL = f"https://api.deepgram.com/v1/speak?model={voice}"
+        DEEPGRAM_API_KEY = os.getenv("DEEPGRAM_API_KEY")  # Use the correct API key
 
-    async with aiohttp.ClientSession() as session:
-        try:
-            async with session.post(
-                DEEPGRAM_URL,
-                headers={
-                    "Authorization": f"Token {DEEPGRAM_API_KEY}",
-                    "Content-Type": "application/json"
-                },
-                json={"text": text}
-            ) as response:
-                if response.status != 200:
-                    # print("TTS request failed")
-                    return
+        payload = {
+            "text": text  # Use the text passed to the function
+        }
 
-                audio_data = await response.read()
-                audio_base64 = base64.b64encode(audio_data).decode("utf-8")
-                message = json.dumps({"audio": audio_base64, "complete": True})
-                print("going to send the TTS back to frontend:", datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-                await message_queue.put(message)
+        headers = {
+            "Authorization": f"Token {DEEPGRAM_API_KEY}",
+            "Content-Type": "application/json"
+        }
 
-        except Exception as e:
-            print(f"TTS error: {e}")
+        response = requests.post(DEEPGRAM_URL, headers=headers, json=payload, stream=True)
+
+        # Check if the response is valid
+        if not response.ok:
+            #print("Failed to get audio from TTS service")
+            return
+
+        # Collect all chunks
+        audio_chunks = []
+        for chunk in response.iter_content(chunk_size=1024):
+            if chunk:
+                audio_chunks.append(chunk)
+
+        # Combine all chunks into a single file
+        combined_audio = b"".join(audio_chunks)
+        audio_base64 = base64.b64encode(combined_audio).decode("utf-8")
+
+        # Send the combined audio to the frontend
+        message = json.dumps({"audio": audio_base64, "complete": True})
+        print("sending response at: ", datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+        message_queue.put_nowait(message)
+    except Exception as e:
+        print(f"TTS error: {e}")
 
 @app.get("/")
 def check_me():
@@ -89,27 +95,19 @@ def check_me():
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
-    loop = asyncio.get_running_loop()  # Get reference to main event loop
-
+    loop = asyncio.get_running_loop()  
     try:
         send_task = None
         dg_connection = deepgram_client.listen.live.v("1")
         message_queue = asyncio.Queue()
-        async def process_llm_response(sentence):
-            try:
-                llm_response = await invoke_model(sentence)
-                await async_tts_service(llm_response, message_queue, "f")
-            except Exception as e:
-                print(f"Processing error: {e}")
 
         def on_message(self, result, **kwargs):
             sentence = result.channel.alternatives[0].transcript
             if result.speech_final and sentence.strip():
                 print("STT done at:", datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-                asyncio.run_coroutine_threadsafe(
-                    process_llm_response(sentence),
-                    loop
-                )
+                llm_response = invoke_model(sentence)
+                async_tts_service(llm_response, message_queue, "f")
+
 
         def on_error(self, error, **kwargs):
             print(f"Deepgram error: {error}")
@@ -158,5 +156,5 @@ async def websocket_endpoint(websocket: WebSocket):
         print("WebSocket already closed.")
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=8001)
 
