@@ -15,7 +15,11 @@ import uvicorn
 from datetime import datetime
 
 # From openai
-from services.openai_service import system_prompt, client
+# from services.openai_service import system_prompt, client
+
+# For direct groq
+# from services.direct_langchain import client
+# from services.openai_service import main_prompt
 
 # For middleware
 from fastapi.middleware.cors import CORSMiddleware
@@ -45,6 +49,26 @@ def invoke_model(input):
     config = {"configurable": {"thread_id": 'abc123'}}
     response = chat_with_model.invoke(input_data, config=config)
     return response["messages"][-1].content
+
+# def invoke_model(input):
+#     chat_completion = client.chat.completions.create(
+#     messages=[
+       
+#         {
+#             "role": "system",
+#             "content": main_prompt
+#         },
+       
+#         {
+#             "role": "user",
+#             "content": input
+#         }
+#     ],
+#     model="mixtral-8x7b-32768"
+#     )
+
+#     print(chat_completion.choices[0].message.content)
+#     return chat_completion.choices[0].message.content
 
 def async_tts_service(text, message_queue, audio):
     print("LLM responded at: ", datetime.now().strftime("%Y-%m-%d %H:%M:%S"))

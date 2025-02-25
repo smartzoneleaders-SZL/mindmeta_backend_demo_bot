@@ -21,8 +21,9 @@ user_info ="Pete Hillman , a 78-year-old retired postmaster from Bristol, UK, wh
 
 
 
-if not os.environ.get("OPENAI_API_KEY"):
-  os.environ["OPENAI_API_KEY"] = os.getenv("OPENAI_API_KEY")
+if not os.environ.get("GROQ_API_KEY"):
+#   os.environ["OPENAI_API_KEY"] = os.getenv("OPENAI_API_KEY")
+  os.environ["GROQ_API_KEY"] = os.getenv("GROQ_API_KEY")
 
 
 
@@ -60,7 +61,8 @@ from langchain.chat_models import init_chat_model
 
 
 # Initialize the chat model
-model = init_chat_model("gpt-3.5-turbo-0125", model_provider="openai")
+# model = init_chat_model("gpt-3.5-turbo-0125", model_provider="openai")
+model = init_chat_model("gemma2-9b-it", model_provider="groq")
 
 # Define the function that calls the model
 def call_model(state: MessagesState):
