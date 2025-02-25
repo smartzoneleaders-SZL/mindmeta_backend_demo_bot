@@ -31,6 +31,12 @@ import re
 from utils.send_tic_tic_voice import send_audio_from_local
 
 
+# For checking the words like kill myself
+from utils.check_sentence_for_email import check_and_send_email
+# For emails
+from services.send_email import send_email
+
+
 
 load_dotenv()
 
@@ -199,6 +205,7 @@ async def websocket_endpoint(websocket: WebSocket):
         def on_message(self, result, **kwargs):
             sentence = result.channel.alternatives[0].transcript
             if result.speech_final and sentence.strip():
+
                 audio_bytes = send_audio_from_local("./tmp/audio/tic_tic_audio.mp3")
                 # Encode the audio bytes in base64
                 audio_base64 = base64.b64encode(audio_bytes).decode('utf-8')
@@ -211,6 +218,17 @@ async def websocket_endpoint(websocket: WebSocket):
 
                 # Put the message in the queue
                 message_queue.put_nowait(message)
+                should_i_send = check_and_send_email(sentence)
+                if should_i_send:
+                    receiver_email ="misterkay78@gmail.com"
+                    subject = "Urgent: Immediate Assistance Required for Patient"
+                    body= """ Dear [CareHome Manager,
+
+                    I am reaching out with great urgency regarding our patient, Phil. He has been displaying concerning behavior and is at risk of self-harm. Immediate intervention is required to ensure his safety.
+
+                    Please take action as soon as possible."""
+                    send_email(receiver_email, subject, body)
+
                 print("STT done at:", datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
                 print("STT is: ",sentence)
                 sentence = clean_text(sentence)
