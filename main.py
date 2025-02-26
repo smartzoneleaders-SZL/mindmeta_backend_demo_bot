@@ -114,7 +114,7 @@ deepgram_client = DeepgramClient(api_key)
 
 def invoke_model(input):
     input_data = {"messages": [{"role": "user", "content": input}]}
-    config = {"configurable": {"thread_id": 'abc123'}}
+    config = {"configurable": {"thread_id": 'abc1234'}}
     response = chat_with_model.invoke(input_data, config=config)
     return response["messages"][-1].content
 
@@ -200,6 +200,7 @@ async def websocket_endpoint(websocket: WebSocket):
     try:
         send_task = None
         dg_connection = deepgram_client.listen.live.v("1")
+        
         message_queue = asyncio.Queue()
 
         def on_message(self, result, **kwargs):
