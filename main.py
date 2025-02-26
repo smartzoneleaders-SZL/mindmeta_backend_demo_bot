@@ -11,6 +11,9 @@ from services.Langchain_service import chat_with_model
 # For running main.py 
 import uvicorn
 
+# import uid for new chats
+import uuid 
+
 # from datetime
 from datetime import datetime
 
@@ -112,9 +115,9 @@ if not api_key:
     raise ValueError("Deepgram API Key is missing.")
 deepgram_client = DeepgramClient(api_key)
 
-def invoke_model(input):
+def invoke_model(input, chat_id):
     input_data = {"messages": [{"role": "user", "content": input}]}
-    config = {"configurable": {"thread_id": 'abc123'}}
+    config = {"configurable": {"thread_id": chat_id}}
     response = chat_with_model.invoke(input_data, config=config)
     return response["messages"][-1].content
 
@@ -147,7 +150,6 @@ def cache(data,chatbot_responses):
 #     return chat_completion.choices[0].message.content
 
 def async_tts_service(text, message_queue, audio):
-    print("LLM responded at: ", datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
     voice = 'aura-athena-en'
     if audio == 'm':
         voice = 'aura-helios-en'
@@ -183,7 +185,6 @@ def async_tts_service(text, message_queue, audio):
 
         # Send the combined audio to the frontend
         message = json.dumps({"audio": audio_base64, "complete": True})
-        print("sending response at: ", datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
         message_queue.put_nowait(message)
     except Exception as e:
         print(f"TTS error: {e}")
@@ -199,7 +200,9 @@ async def websocket_endpoint(websocket: WebSocket):
     loop = asyncio.get_running_loop()  
     try:
         send_task = None
+        new_chat_id = uuid.uuid1()
         dg_connection = deepgram_client.listen.live.v("1")
+        
         message_queue = asyncio.Queue()
 
         def on_message(self, result, **kwargs):
@@ -228,14 +231,10 @@ async def websocket_endpoint(websocket: WebSocket):
 
                     Please take action as soon as possible."""
                     send_email(receiver_email, subject, body)
-
-                print("STT done at:", datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-                print("STT is: ",sentence)
                 sentence = clean_text(sentence)
                 cache_respone = cache(sentence,chatbot_responses)
-                print("cached reposne is: ",cache_respone)
                 if cache_respone is False:
-                    llm_response = invoke_model(sentence)  
+                    llm_response = invoke_model(sentence,new_chat_id)  
                     async_tts_service(llm_response, message_queue, "f")
                 else:
                     async_tts_service(cache_respone, message_queue, "f")
