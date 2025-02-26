@@ -66,7 +66,7 @@ model = init_chat_model("gemma2-9b-it", model_provider="groq")
 
 # Define the function that calls the model
 def call_model(state: MessagesState):
-    response = model.invoke(state["messages"])
+    response = model.invoke(state["messages"][-5:])    # Here i am sending jsut last 5 messages
     return {"messages": [response]}
 
 
