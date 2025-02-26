@@ -117,6 +117,7 @@ deepgram_client = DeepgramClient(api_key)
 
 def invoke_model(input, chat_id):
     input_data = {"messages": [{"role": "user", "content": input}]}
+    print("New Id for chat is: ", chat_id)
     config = {"configurable": {"thread_id": chat_id}}
     response = chat_with_model.invoke(input_data, config=config)
     return response["messages"][-1].content
