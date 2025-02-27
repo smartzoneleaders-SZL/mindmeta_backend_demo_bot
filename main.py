@@ -158,7 +158,7 @@ def async_tts_service(text, message_queue, audio):
     voice = 'aura-athena-en'
     if audio == 'm':
         voice = 'aura-helios-en'
-    try:
+    try: 
         DEEPGRAM_URL = f"https://api.deepgram.com/v1/speak?model={voice}"
         DEEPGRAM_API_KEY = os.getenv("DEEPGRAM_API_KEY")  # Use the correct API key
 
@@ -215,6 +215,7 @@ async def websocket_endpoint(websocket: WebSocket):
         def on_message(self, result, **kwargs):
             sentence = result.channel.alternatives[0].transcript
             if result.speech_final and sentence.strip():
+                print("Full transcriptipn",sentence)
 
                 # audio_bytes = send_audio_from_local("./tmp/audio/tic_tic_audio.mp3")
                 # # Encode the audio bytes in base64
@@ -263,6 +264,7 @@ async def websocket_endpoint(websocket: WebSocket):
             smart_format=True,
             interim_results=True,
             language="en",
+            endpointing=1500
         )
 
         if not dg_connection.start(options):
