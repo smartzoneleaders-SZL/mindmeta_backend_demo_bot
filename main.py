@@ -261,19 +261,9 @@ async def websocket_endpoint(websocket: WebSocket):
 
         options = LiveOptions(
             model="nova-3",
-            language="en-US",
-            # Apply smart formatting to the output
             smart_format=True,
-            # Raw audio format details
-            encoding="linear16",
-            channels=1,
-            sample_rate=16000,
-            # To get UtteranceEnd, the following must be set:
             interim_results=True,
-            utterance_end_ms="1000",
-            vad_events=True,
-            # Time in milliseconds of silence to wait for before finalizing speech
-            endpointing=2000
+            language="en",
         )
 
 
