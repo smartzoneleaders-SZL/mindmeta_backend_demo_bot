@@ -7,7 +7,7 @@ import asyncio
 import os
 from dotenv import load_dotenv
 from services.Langchain_service import chat_with_model
-
+import logging
 # For extracting history
 from services.after_call_ends import get_chat_hisory
 
@@ -119,7 +119,7 @@ if not api_key:
 deepgram_client = DeepgramClient(api_key)
 
 def invoke_model(input, chat_id):
-    print(chat_id)
+    logging.info(chat_id)
     input_data = {"messages": [{"role": "user", "content": input}]}
     config = {"configurable": {"thread_id": chat_id}}
     response = chat_with_model.invoke(input_data, config=config)
@@ -154,7 +154,7 @@ def cache(data,chatbot_responses):
 #     return chat_completion.choices[0].message.content
 
 def async_tts_service(text, message_queue, audio):
-    print("Sending llm to TTS: ",text)
+    logging.info("Sending llm to TTS: ",text)
     voice = 'aura-athena-en'
     if audio == 'm':
         voice = 'aura-helios-en'
@@ -190,7 +190,7 @@ def async_tts_service(text, message_queue, audio):
 
         # Send the combined audio to the frontend
         message = json.dumps({"audio": audio_base64, "complete": True})
-        print("Sending voice to frontend")
+        logging.info("Sending voice to frontend")
         message_queue.put_nowait(message)
     except Exception as e:
         print(f"TTS error: {e}")
@@ -215,7 +215,7 @@ async def websocket_endpoint(websocket: WebSocket):
         def on_message(self, result, **kwargs):
             sentence = result.channel.alternatives[0].transcript
             if result.speech_final and sentence.strip():
-                print("Full transcriptipn",sentence)
+                logging.info("Full transcriptipn",sentence)
 
                 # audio_bytes = send_audio_from_local("./tmp/audio/tic_tic_audio.mp3")
                 # # Encode the audio bytes in base64
@@ -253,7 +253,7 @@ async def websocket_endpoint(websocket: WebSocket):
             print(f"Deepgram error: {error}")
 
         def on_close(self, *args, **kwargs):  
-            print("Deepgram connection closed")
+            logging.info("Deepgram connection closed")
 
         dg_connection.on(LiveTranscriptionEvents.Transcript, on_message)
         dg_connection.on(LiveTranscriptionEvents.Error, on_error)
