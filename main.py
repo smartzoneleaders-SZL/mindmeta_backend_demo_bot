@@ -8,6 +8,9 @@ import os
 from dotenv import load_dotenv
 from services.Langchain_service import chat_with_model
 
+# For extracting history
+from services.after_call_ends import get_chat_hisory
+
 # For running main.py 
 import uvicorn
 
@@ -116,6 +119,7 @@ if not api_key:
 deepgram_client = DeepgramClient(api_key)
 
 def invoke_model(input, chat_id):
+    print(chat_id)
     input_data = {"messages": [{"role": "user", "content": input}]}
     config = {"configurable": {"thread_id": chat_id}}
     response = chat_with_model.invoke(input_data, config=config)
@@ -150,6 +154,7 @@ def cache(data,chatbot_responses):
 #     return chat_completion.choices[0].message.content
 
 def async_tts_service(text, message_queue, audio):
+    print("Sending llm to TTS: ",text)
     voice = 'aura-athena-en'
     if audio == 'm':
         voice = 'aura-helios-en'
@@ -185,6 +190,7 @@ def async_tts_service(text, message_queue, audio):
 
         # Send the combined audio to the frontend
         message = json.dumps({"audio": audio_base64, "complete": True})
+        print("Sending voice to frontend")
         message_queue.put_nowait(message)
     except Exception as e:
         print(f"TTS error: {e}")
@@ -201,6 +207,7 @@ async def websocket_endpoint(websocket: WebSocket):
     try:
         send_task = None
         new_chat_id = uuid.uuid1()
+        
         dg_connection = deepgram_client.listen.live.v("1")
         
         message_queue = asyncio.Queue()
@@ -209,18 +216,18 @@ async def websocket_endpoint(websocket: WebSocket):
             sentence = result.channel.alternatives[0].transcript
             if result.speech_final and sentence.strip():
 
-                audio_bytes = send_audio_from_local("./tmp/audio/tic_tic_audio.mp3")
-                # Encode the audio bytes in base64
-                audio_base64 = base64.b64encode(audio_bytes).decode('utf-8')
+                # audio_bytes = send_audio_from_local("./tmp/audio/tic_tic_audio.mp3")
+                # # Encode the audio bytes in base64
+                # audio_base64 = base64.b64encode(audio_bytes).decode('utf-8')
         
-                # Create the message with the base64-encoded audio
-                message = json.dumps({
-                    "audio": audio_base64,
-                    "complete": True
-                })
+                # # Create the message with the base64-encoded audio
+                # message = json.dumps({
+                #     "audio": audio_base64,
+                #     "complete": True
+                # })
 
                 # Put the message in the queue
-                message_queue.put_nowait(message)
+                # message_queue.put_nowait(message)
                 should_i_send = check_and_send_email(sentence)
                 if should_i_send:
                     receiver_email ="misterkay78@gmail.com"
@@ -274,6 +281,7 @@ async def websocket_endpoint(websocket: WebSocket):
                 data = await websocket.receive_bytes()
                 dg_connection.send(data)
             except WebSocketDisconnect:
+                get_chat_hisory(chat_with_model,new_chat_id)
                 break
 
     except Exception as e:
