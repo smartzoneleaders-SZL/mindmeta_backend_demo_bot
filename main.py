@@ -119,7 +119,7 @@ if not api_key:
 deepgram_client = DeepgramClient(api_key)
 
 def invoke_model(input, chat_id):
-    print(chat_id)
+
     input_data = {"messages": [{"role": "user", "content": input}]}
     config = {"configurable": {"thread_id": chat_id}}
     response = chat_with_model.invoke(input_data, config=config)
@@ -154,7 +154,6 @@ def cache(data,chatbot_responses):
 #     return chat_completion.choices[0].message.content
 
 def async_tts_service(text, message_queue, audio):
-    print("Sending llm to TTS: ",text)
     voice = 'aura-athena-en'
     if audio == 'm':
         voice = 'aura-helios-en'
@@ -190,7 +189,7 @@ def async_tts_service(text, message_queue, audio):
 
         # Send the combined audio to the frontend
         message = json.dumps({"audio": audio_base64, "complete": True})
-        print("Sending voice to frontend")
+
         message_queue.put_nowait(message)
     except Exception as e:
         print(f"TTS error: {e}")
@@ -200,102 +199,129 @@ def check_me():
     return {"message":"Done"}
 
 
+
+
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
-    loop = asyncio.get_running_loop()  
-    try:
-        send_task = None
-        new_chat_id = uuid.uuid1()
-        
-        dg_connection = deepgram_client.listen.live.v("1")
-        
-        message_queue = asyncio.Queue()
+    loop = asyncio.get_running_loop()
+    send_task = None
+    new_chat_id = uuid.uuid1()
 
-        def on_message(self, result, **kwargs):
-            sentence = result.channel.alternatives[0].transcript
-            if result.speech_final and sentence.strip():
-                print("Full transcriptipn",sentence)
+    dg_connection = deepgram_client.listen.websocket.v("1")
+    message_queue = asyncio.Queue()
 
-                # audio_bytes = send_audio_from_local("./tmp/audio/tic_tic_audio.mp3")
-                # # Encode the audio bytes in base64
-                # audio_base64 = base64.b64encode(audio_bytes).decode('utf-8')
-        
-                # # Create the message with the base64-encoded audio
-                # message = json.dumps({
-                #     "audio": audio_base64,
-                #     "complete": True
-                # })
+    # Variables to track the current transcript and silence timer
+    current_transcript = ""
+    silence_timer = None
 
-                # Put the message in the queue
-                # message_queue.put_nowait(message)
-                should_i_send = check_and_send_email(sentence)
-                if should_i_send:
-                    receiver_email ="misterkay78@gmail.com"
-                    subject = "Urgent: Immediate Assistance Required for Patient"
-                    body= """ Dear [CareHome Manager,
+    def on_open(self, open, **kwargs):
+        print(f"Deepgram connection opened: {open}")
 
-                    I am reaching out with great urgency regarding our patient, Phil. He has been displaying concerning behavior and is at risk of self-harm. Immediate intervention is required to ensure his safety.
+    def on_message(self, result, **kwargs):
+        nonlocal current_transcript, silence_timer
+        latest_transcript = result.channel.alternatives[0].transcript.strip()
 
-                    Please take action as soon as possible."""
-                    send_email(receiver_email, subject, body)
-                sentence = clean_text(sentence)
-                cache_respone = cache(sentence,chatbot_responses)
-                if cache_respone is False:
-                    llm_response = invoke_model(sentence,new_chat_id)  
-                    async_tts_service(llm_response, message_queue, "f")
-                else:
-                    async_tts_service(cache_respone, message_queue, "f")
+        if result.is_final and latest_transcript != "":
+            
+            
+            # Merge with previous transcript if it exists.
+            if current_transcript:
+                current_transcript += " " + latest_transcript
+            else:
+                current_transcript = latest_transcript
+
+            # Cancel the existing timer if it's still running.
+            if silence_timer is not None and not silence_timer.done():
+                silence_timer.cancel()
+            
+            # Start a new silence timer on the main event loop.
+            silence_timer = asyncio.run_coroutine_threadsafe(wait_for_silence(), loop)
+
+
+    async def wait_for_silence():
+        nonlocal current_transcript, silence_timer
+        try:
+            await asyncio.sleep(4)  # Wait for 4 seconds of silence
+            
+
+            # Check if an email should be sent
+            if check_and_send_email(current_transcript):
+                receiver_email = "misterkay78@gmail.com"
+                subject = "Urgent: Immediate Assistance Required for Patient"
+                body = """Dear CareHome Manager,
+
+I am reaching out with great urgency regarding our patient, Phil. He has been displaying concerning behavior and is at risk of self-harm. Immediate intervention is required to ensure his safety.
+
+Please take action as soon as possible."""
+                send_email(receiver_email, subject, body)
+
+            cleaned_sentence = clean_text(current_transcript)
+            cached_response = cache(cleaned_sentence, chatbot_responses)
+
+            if not cached_response:
                 
+                llm_response = invoke_model(cleaned_sentence, new_chat_id)
+                async_tts_service(llm_response, message_queue, "f")
+            else:
+                async_tts_service(cached_response, message_queue, "f")
 
+            # Clear the transcript after processing
+            current_transcript = ""
+        except asyncio.CancelledError:
+            # Timer was canceled because a new final result arrived before timeout
+            pass
 
-        def on_error(self, error, **kwargs):
-            print(f"Deepgram error: {error}")
+    def on_error(self,error, **kwargs):
+        print(f"Deepgram error: {error}")
 
-        def on_close(self, *args, **kwargs):  
-            print("Deepgram connection closed")
+    def on_close(self, close, **kwargs):
+        print(f"Deepgram connection closed: {close}")
 
-        dg_connection.on(LiveTranscriptionEvents.Transcript, on_message)
-        dg_connection.on(LiveTranscriptionEvents.Error, on_error)
-        dg_connection.on(LiveTranscriptionEvents.Close, on_close)
+    dg_connection.on(LiveTranscriptionEvents.Open, on_open)
+    dg_connection.on(LiveTranscriptionEvents.Transcript, on_message)
+    dg_connection.on(LiveTranscriptionEvents.Error, on_error)
+    dg_connection.on(LiveTranscriptionEvents.Close, on_close)
 
-        options = LiveOptions(
-            model="nova-3",
-            smart_format=True,
-            interim_results=True,
-            language="en",
-            endpointing=1500
-        )
+    options: LiveOptions = LiveOptions(
+        model="nova-3",
+        language="en-US",
+        smart_format=True,
+        interim_results=True,
+        utterance_end_ms="2000",
+        vad_events=True,
+        endpointing=400
+    )
 
-        if not dg_connection.start(options):
-            await websocket.close()
-            return
+    if not dg_connection.start(options):
+        await websocket.close()
+        return
 
-        async def send_messages():
-            while True:
-                message = await message_queue.get()
-                await websocket.send_text(message)
-
-        send_task = asyncio.create_task(send_messages())
-
+    async def send_messages():
         while True:
-            try:
-                data = await websocket.receive_bytes()
-                dg_connection.send(data)
-            except WebSocketDisconnect:
-                get_chat_hisory(chat_with_model,new_chat_id)
-                break
+            message = await message_queue.get()
+            await websocket.send_text(message)
 
+    send_task = asyncio.create_task(send_messages())
+
+    try:
+        while True:
+            data = await websocket.receive_bytes()
+            dg_connection.send(data)
+    except WebSocketDisconnect:
+        get_chat_hisory(chat_with_model, new_chat_id)
     except Exception as e:
         print(f"WebSocket error: {e}")
     finally:
         dg_connection.finish()
-        if send_task is not None:
+        if send_task:
             send_task.cancel()
-    try:
-        await websocket.close()
-    except RuntimeError:
-        print("WebSocket already closed.")
+        try:
+            await websocket.close()
+        except RuntimeError:
+            print("WebSocket already closed.")
+
+
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
