@@ -7,7 +7,7 @@ import asyncio
 import os
 from dotenv import load_dotenv
 from services.Langchain_service import chat_with_model
-
+import logging
 # For extracting history
 from services.after_call_ends import get_chat_hisory
 
@@ -119,7 +119,11 @@ if not api_key:
 deepgram_client = DeepgramClient(api_key)
 
 def invoke_model(input, chat_id):
+<<<<<<< HEAD
 
+=======
+    logging.info(chat_id)
+>>>>>>> 4b9ae9dcb76c15f7e6689fb859b654da7d244fd5
     input_data = {"messages": [{"role": "user", "content": input}]}
     config = {"configurable": {"thread_id": chat_id}}
     response = chat_with_model.invoke(input_data, config=config)
@@ -154,6 +158,10 @@ def cache(data,chatbot_responses):
 #     return chat_completion.choices[0].message.content
 
 def async_tts_service(text, message_queue, audio):
+<<<<<<< HEAD
+=======
+    logging.info("Sending llm to TTS: ",text)
+>>>>>>> 4b9ae9dcb76c15f7e6689fb859b654da7d244fd5
     voice = 'aura-athena-en'
     if audio == 'm':
         voice = 'aura-helios-en'
@@ -189,7 +197,11 @@ def async_tts_service(text, message_queue, audio):
 
         # Send the combined audio to the frontend
         message = json.dumps({"audio": audio_base64, "complete": True})
+<<<<<<< HEAD
 
+=======
+        logging.info("Sending voice to frontend")
+>>>>>>> 4b9ae9dcb76c15f7e6689fb859b654da7d244fd5
         message_queue.put_nowait(message)
     except Exception as e:
         print(f"TTS error: {e}")
@@ -208,8 +220,15 @@ async def websocket_endpoint(websocket: WebSocket):
     send_task = None
     new_chat_id = uuid.uuid1()
 
+<<<<<<< HEAD
     dg_connection = deepgram_client.listen.websocket.v("1")
     message_queue = asyncio.Queue()
+=======
+        def on_message(self, result, **kwargs):
+            sentence = result.channel.alternatives[0].transcript
+            if result.speech_final and sentence.strip():
+                logging.info("Full transcriptipn",sentence)
+>>>>>>> 4b9ae9dcb76c15f7e6689fb859b654da7d244fd5
 
     # Variables to track the current transcript and silence timer
     current_transcript = ""
@@ -275,14 +294,20 @@ Please take action as soon as possible."""
     def on_error(self,error, **kwargs):
         print(f"Deepgram error: {error}")
 
+<<<<<<< HEAD
     def on_close(self, close, **kwargs):
         print(f"Deepgram connection closed: {close}")
+=======
+        def on_close(self, *args, **kwargs):  
+            logging.info("Deepgram connection closed")
+>>>>>>> 4b9ae9dcb76c15f7e6689fb859b654da7d244fd5
 
     dg_connection.on(LiveTranscriptionEvents.Open, on_open)
     dg_connection.on(LiveTranscriptionEvents.Transcript, on_message)
     dg_connection.on(LiveTranscriptionEvents.Error, on_error)
     dg_connection.on(LiveTranscriptionEvents.Close, on_close)
 
+<<<<<<< HEAD
     options: LiveOptions = LiveOptions(
         model="nova-3",
         language="en-US",
@@ -296,6 +321,26 @@ Please take action as soon as possible."""
     if not dg_connection.start(options):
         await websocket.close()
         return
+=======
+        options = LiveOptions(
+            model="nova-3",
+            smart_format=True,
+            interim_results=True,
+            language="en",
+        )
+
+
+        if not dg_connection.start(options):
+            await websocket.close()
+            return
+
+        async def send_messages():
+            while True:
+                message = await message_queue.get()
+                await websocket.send_text(message)
+
+        send_task = asyncio.create_task(send_messages())
+>>>>>>> 4b9ae9dcb76c15f7e6689fb859b654da7d244fd5
 
     async def send_messages():
         while True:
