@@ -119,7 +119,6 @@ if not api_key:
 deepgram_client = DeepgramClient(api_key)
 
 def invoke_model(input, chat_id):
-    print("Model isbeing invoked: ",input)
     input_data = {"messages": [{"role": "user", "content": input}]}
     config = {"configurable": {"thread_id": chat_id}}
     response = chat_with_model.invoke(input_data, config=config)
@@ -154,7 +153,6 @@ def cache(data,chatbot_responses):
 #     return chat_completion.choices[0].message.content
 
 def async_tts_service(text, message_queue, audio):
-    print("Sending llm to TTS: ",text)
     voice = 'aura-athena-en'
     if audio == 'm':
         voice = 'aura-helios-en'
@@ -213,7 +211,7 @@ async def websocket_endpoint(websocket: WebSocket):
     message_queue = asyncio.Queue()
 
     # Variables to track the current transcript and silence timer
-    current_transcript = ""
+    current_transcript = False
     silence_timer = None
 
     def on_open(self, open, **kwargs):
@@ -222,20 +220,20 @@ async def websocket_endpoint(websocket: WebSocket):
     def on_message(self, result, **kwargs):
         nonlocal current_transcript, silence_timer
         latest_transcript = result.channel.alternatives[0].transcript.strip()
-        print(f"Intermediate transcript: {latest_transcript}")
+
 
         if result.is_final and latest_transcript != "":
-            print(f"Final Transcription: {latest_transcript}")
+
             
             # Merge with previous transcript if it exists.
             if current_transcript:
                 current_transcript += " " + latest_transcript
-                
+
             else:
                 current_transcript = latest_transcript
 
             # Cancel the existing timer if it's still running.
-            if silence_timer is not None and not silence_timer.done():
+            if silence_timer is not None:
                 silence_timer.cancel()
             
             # Start a new silence timer on the main event loop.
@@ -246,7 +244,7 @@ async def websocket_endpoint(websocket: WebSocket):
         nonlocal current_transcript, silence_timer
         try:
             await asyncio.sleep(4)  # Wait for 4 seconds of silence
-            print("Silence detected. Processing complete sentence.")
+
 
             # Check if an email should be sent
             if check_and_send_email(current_transcript):
@@ -270,7 +268,8 @@ Please take action as soon as possible."""
                 async_tts_service(cached_response, message_queue, "f")
 
             # Clear the transcript after processing
-            current_transcript = ""
+            current_transcript = False
+            silence_timer = None
         except asyncio.CancelledError:
             # Timer was canceled because a new final result arrived before timeout
             pass
