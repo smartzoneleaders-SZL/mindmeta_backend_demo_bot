@@ -243,7 +243,7 @@ async def websocket_endpoint(websocket: WebSocket):
     async def wait_for_silence():
         nonlocal current_transcript, silence_timer
         try:
-            await asyncio.sleep(4)  # Wait for 4 seconds of silence
+            await asyncio.sleep(3)  # Wait for 4 seconds of silence
 
 
             # Check if an email should be sent
