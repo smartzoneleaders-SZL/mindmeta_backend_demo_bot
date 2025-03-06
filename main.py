@@ -203,6 +203,19 @@ def check_me():
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
+     # Expect the patient ID as the first message (text) from the frontend.
+    try:
+        patient_id = await asyncio.wait_for(websocket.receive_json(), timeout=2.0)
+    except asyncio.TimeoutError:
+        await websocket.send_text("Error: Patient ID not received in time.")
+        await websocket.close()
+        return
+    # patient_id = "67c7f2ceed98127dfee34152"
+    if not patient_id:
+        await websocket.send_text("Error: Invalid Patient ID.")
+        await websocket.close()
+        return
+    print("Patient id is : ",patient_id)
     loop = asyncio.get_running_loop()
     send_task = None
     new_chat_id = uuid.uuid1()
@@ -219,60 +232,63 @@ async def websocket_endpoint(websocket: WebSocket):
 
     def on_message(self, result, **kwargs):
         nonlocal current_transcript, silence_timer
+        # Get the latest transcript text (strip whitespace)
         latest_transcript = result.channel.alternatives[0].transcript.strip()
-
-
-        if result.is_final and latest_transcript != "":
-
-            
+        print("check the transcript: ",latest_transcript)
+        # If any new text arrives (regardless of is_final status)
+        if latest_transcript:
             # Merge with previous transcript if it exists.
             if current_transcript:
                 current_transcript += " " + latest_transcript
-
             else:
                 current_transcript = latest_transcript
 
-            # Cancel the existing timer if it's still running.
+            # Cancel the existing timer (if running) to extend the wait time
             if silence_timer is not None:
+                print("Timer canceled")
                 silence_timer.cancel()
-            
-            # Start a new silence timer on the main event loop.
+        
+            # Restart the silence timer with a 3-second delay.
+            # This means if any new transcript comes which is not "" in within 3 seconds,
+            # the timer will be reset and the final dispatch postponed.
             silence_timer = asyncio.run_coroutine_threadsafe(wait_for_silence(), loop)
 
 
     async def wait_for_silence():
         nonlocal current_transcript, silence_timer
         try:
-            await asyncio.sleep(3)  # Wait for 4 seconds of silence
+            # Wait for 3 seconds of silence.
+            await asyncio.sleep(3)
 
-
-            # Check if an email should be sent
+            # At this point, no new transcript has arrived for 3 seconds.
+            # Process the merged transcript.
             if check_and_send_email(current_transcript):
                 receiver_email = "misterkay78@gmail.com"
                 subject = "Urgent: Immediate Assistance Required for Patient"
                 body = """Dear CareHome Manager,
 
-I am reaching out with great urgency regarding our patient, Phil. He has been displaying concerning behavior and is at risk of self-harm. Immediate intervention is required to ensure his safety.
+    I am reaching out with great urgency regarding our patient, Phil. He has been displaying concerning behavior and is at risk of self-harm. Immediate intervention is required to ensure his safety.
 
-Please take action as soon as possible."""
+    Please take action as soon as possible."""
                 send_email(receiver_email, subject, body)
 
             cleaned_sentence = clean_text(current_transcript)
             cached_response = cache(cleaned_sentence, chatbot_responses)
 
             if not cached_response:
-                
+                print("Final result to llm is: ",cleaned_sentence)
                 llm_response = invoke_model(cleaned_sentence, new_chat_id)
                 async_tts_service(llm_response, message_queue, "f")
             else:
                 async_tts_service(cached_response, message_queue, "f")
 
-            # Clear the transcript after processing
+            # Clear the transcript and timer after processing.
             current_transcript = False
             silence_timer = None
         except asyncio.CancelledError:
-            # Timer was canceled because a new final result arrived before timeout
+            # This exception occurs if the timer is cancelled due to a new transcript.
             pass
+
 
     def on_error(self,error, **kwargs):
         print(f"Deepgram error: {error}")
@@ -311,7 +327,7 @@ Please take action as soon as possible."""
             data = await websocket.receive_bytes()
             dg_connection.send(data)
     except WebSocketDisconnect:
-        get_chat_hisory(chat_with_model, new_chat_id)
+        await get_chat_hisory(patient_id,chat_with_model, new_chat_id)
     except Exception as e:
         print(f"WebSocket error: {e}")
     finally:
