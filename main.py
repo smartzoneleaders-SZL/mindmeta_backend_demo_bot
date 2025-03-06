@@ -224,45 +224,47 @@ async def websocket_endpoint(websocket: WebSocket):
     message_queue = asyncio.Queue()
 
     # Variables to track the current transcript and silence timer
-    current_transcript = False
+    final_transcript = False
     silence_timer = None
 
     def on_open(self, open, **kwargs):
         print(f"Deepgram connection opened: {open}")
 
     def on_message(self, result, **kwargs):
-        nonlocal current_transcript, silence_timer
-        # Get the latest transcript text (strip whitespace)
+        nonlocal final_transcript, silence_timer
         latest_transcript = result.channel.alternatives[0].transcript.strip()
-        print("check the transcript: ",latest_transcript)
-        # If any new text arrives (regardless of is_final status)
-        if latest_transcript:
-            # Merge with previous transcript if it exists.
-            if current_transcript:
-                current_transcript += " " + latest_transcript
-            else:
-                current_transcript = latest_transcript
 
-            # Cancel the existing timer (if running) to extend the wait time
+        # Only process if new transcript text is non-empty.
+        if latest_transcript:
+            print("Latest transcription is:", latest_transcript)
+            if result.is_final:
+                if final_transcript:
+                    final_transcript += " " + latest_transcript
+                else:
+                    final_transcript = latest_transcript
+                print("Merged final segment:", final_transcript)
+            else:
+                print("Interim transcript received:", latest_transcript)
+
+            # Cancel and restart the timer
             if silence_timer is not None:
-                print("Timer canceled")
                 silence_timer.cancel()
-        
-            # Restart the silence timer with a 3-second delay.
-            # This means if any new transcript comes which is not "" in within 3 seconds,
-            # the timer will be reset and the final dispatch postponed.
+                print("Timer canceled")
             silence_timer = asyncio.run_coroutine_threadsafe(wait_for_silence(), loop)
+        else:
+            # No new text, so do nothing
+            pass
+
 
 
     async def wait_for_silence():
-        nonlocal current_transcript, silence_timer
+        nonlocal final_transcript, silence_timer
         try:
-            # Wait for 3 seconds of silence.
-            await asyncio.sleep(3)
-
-            # At this point, no new transcript has arrived for 3 seconds.
-            # Process the merged transcript.
-            if check_and_send_email(current_transcript):
+            await asyncio.sleep(3)  # Wait for 3 seconds of silence
+            # Now dispatch the final, merged transcript to your downstream process
+            print("Final result to llm is:", final_transcript)
+        
+            if check_and_send_email(final_transcript):
                 receiver_email = "misterkay78@gmail.com"
                 subject = "Urgent: Immediate Assistance Required for Patient"
                 body = """Dear CareHome Manager,
@@ -272,21 +274,20 @@ async def websocket_endpoint(websocket: WebSocket):
     Please take action as soon as possible."""
                 send_email(receiver_email, subject, body)
 
-            cleaned_sentence = clean_text(current_transcript)
+            cleaned_sentence = clean_text(final_transcript)
             cached_response = cache(cleaned_sentence, chatbot_responses)
-
             if not cached_response:
-                print("Final result to llm is: ",cleaned_sentence)
+                print("Text to llm is: ",cleaned_sentence)
                 llm_response = invoke_model(cleaned_sentence, new_chat_id)
                 async_tts_service(llm_response, message_queue, "f")
             else:
                 async_tts_service(cached_response, message_queue, "f")
-
-            # Clear the transcript and timer after processing.
-            current_transcript = False
+        
+            # Clear the final transcript and timer after processing.
+            final_transcript = ""
             silence_timer = None
         except asyncio.CancelledError:
-            # This exception occurs if the timer is cancelled due to a new transcript.
+            # Timer was canceled because a new segment arrived.
             pass
 
 
