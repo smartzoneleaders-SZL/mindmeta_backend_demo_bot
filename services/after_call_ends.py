@@ -28,7 +28,7 @@ async def get_chat_hisory(patient_id ,chat_with_model,call_id):
         human_messages = get_human_messages_out_of_call_chat(chat_history)
         sentiment_analysis = check_sentiment_using_textblob(human_messages)
         sentiment_analysis_apended = append_sentiment_analysis_value(chat_history,sentiment_analysis)
-        did_upload = await upload_chats_on_mongodb(patient_id, call_id, sentiment_analysis_apended)
+        did_upload = await upload_on_mongodb(patient_id, call_id, sentiment_analysis_apended)
         # print("History is: ",state_snapshot.values["messages"])
         if did_upload:
             return True
@@ -82,18 +82,6 @@ def parse_chat_history(messages):
                 current_human = None  
     print(parsed_chats)
     return parsed_chats
-
-
-async def upload_chats_on_mongodb(patient_id, call_id, chats):
-    print("Entered upload_chats_on_mongodb in after call ends.py")
-    try:
-        did_upload = await upload_on_mongodb(patient_id,call_id, chats)
-        if(did_upload):
-            print("Returned value: ",did_upload)
-        else:
-            return False
-    except Exception as e:
-        print("Error on after_call_ends.py : ",str(e))
 
 
 

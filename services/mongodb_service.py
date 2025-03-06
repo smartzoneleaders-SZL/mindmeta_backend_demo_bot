@@ -44,24 +44,3 @@ async def upload_on_mongodb(patient_id: str, call_id, new_chats: list) -> int:
         logger.error("Error in upload_on_mongodb: %s", str(e))
         raise
 
-async def get_document_by_patient_id(patient_id: str) -> dict:
-    """
-    Retrieves a document from the 'chats' collection using the patient_id attribute.
-    
-    Args:
-        patient_id (str): The patient identifier.
-        
-    Returns:
-        dict: The document as a dictionary, or None if not found.
-    """
-    try:
-        # Query by the patient_id attribute
-        document = await db.chats.find_one({"patient_id": patient_id})
-        if document:
-            logger.info("Document retrieved successfully for patient_id: %s", patient_id)
-        else:
-            logger.info("No document found for patient_id: %s", patient_id)
-        return document
-    except Exception as e:
-        logger.error("Error retrieving document for patient_id %s: %s", patient_id, str(e))
-        raise
