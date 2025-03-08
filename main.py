@@ -2,6 +2,7 @@ import azure.cognitiveservices.speech as speechsdk
 from fastapi import FastAPI, WebSocket
 import uuid
 from openai import AsyncAzureOpenAI
+from datetime import datetime
 import asyncio
 import threading
 
@@ -59,7 +60,7 @@ state = ConversationState()
 
 # Azure Speech Config
 speech_config = speechsdk.SpeechConfig(subscription=AZURE_SPEECH_KEY, region=AZURE_REGION)
-speech_config.set_property(speechsdk.PropertyId.Speech_SegmentationSilenceTimeoutMs, "500")
+speech_config.set_property(speechsdk.PropertyId.Speech_SegmentationSilenceTimeoutMs, "100")
 speech_config.set_speech_synthesis_output_format(speechsdk.SpeechSynthesisOutputFormat.Riff16Khz16BitMonoPcm)
 
 
@@ -127,6 +128,8 @@ async def websocket_endpoint(websocket: WebSocket):
             if last_text:
                 # Safely remove the recognized text so it isn’t processed twice.
                 user_text = state.active_patients[patient_id].pop("last_text", "")
+                print("STT done at: ",datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+
                 # print("User text is:", user_text)
                 # Stream GPT response directly to TTS.
                 await stream_response_to_tts(patient_id, user_text, websocket)
@@ -158,8 +161,8 @@ async def stream_response_to_tts(patient_id: str, user_text: str, websocket: Web
 
         # Set extended timeout properties to handle GPT latency.
         properties = {
-            "SpeechSynthesis_FrameTimeoutInterval": "100000000",
-            "SpeechSynthesis_RtfTimeoutThreshold": "10"
+            "SpeechSynthesis_FrameTimeoutInterval": "10",
+            "SpeechSynthesis_RtfTimeoutThreshold": "2"
         }
         tts_speech_config.set_properties_by_name(properties)
 
@@ -168,16 +171,18 @@ async def stream_response_to_tts(patient_id: str, user_text: str, websocket: Web
         audio_config = speechsdk.audio.AudioOutputConfig(stream=pull_stream)
         tts_synthesizer = speechsdk.SpeechSynthesizer(speech_config=tts_speech_config, audio_config=audio_config)
 
-        # Attach an event handler so that synthesized audio chunks are sent immediately to the frontend.
-        # def synthesizing_handler(evt):
-        #     pass
-            # print("Synthesizing_handle called")
+        # Pre-connect: establish a connection to lower latency.
+        connection = speechsdk.Connection.from_speech_synthesizer(tts_synthesizer)
+        connection.open(True)
+
+        # Optionally attach an event handler to stream synthesized audio chunks as they arrive.
+        def synthesizing_handler(evt):
+            pass
+            # print("Synthesizing_handler called")
             # if evt.audio_data:
-            #     print("Audio data length:", len(evt.audio_data), "bytes")
-            #     # Print the first 20 bytes in hex for inspection
-            #     print("First 20 bytes (hex):", evt.audio_data[:20].hex())
+            #     print("Audio chunk length:", len(evt.audio_data))
             #     asyncio.create_task(websocket.send_bytes(evt.audio_data))
-        # tts_synthesizer.synthesizing.connect(synthesizing_handler)
+        tts_synthesizer.synthesizing.connect(synthesizing_handler)
 
         # Create a TTS request with TextStream input type.
         tts_request = speechsdk.SpeechSynthesisRequest(
@@ -217,20 +222,21 @@ async def stream_response_to_tts(patient_id: str, user_text: str, websocket: Web
                     delta = chunk.choices[0].delta.content or ""
                 if delta:
                     full_response += delta
-                    # As soon as a text chunk is received, write it to the TTS input stream.
                     # print("Sending to TTS:", delta)
+                    # Write each text chunk to the TTS input stream.
                     tts_request.input_stream.write(delta)
                     if state.stop_synthesis.is_set():
                         break
 
         # Signal that no more text is coming.
+        print("LLM done at: ",datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
         tts_request.input_stream.close()
 
         # Wait for the TTS synthesis task to complete.
         result = tts_task.get()
         if result.reason == speechsdk.ResultReason.SynthesizingAudioCompleted:
             audio_data = result.audio_data  # This is a bytes object with the complete synthesized audio.
-            # print("Final audio data length:", len(audio_data), "bytes")
+            print("TTS done at: ",datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
             await websocket.send_bytes(audio_data)
         else:
             error_details = result.error_details if result.error_details else "Unknown error"
