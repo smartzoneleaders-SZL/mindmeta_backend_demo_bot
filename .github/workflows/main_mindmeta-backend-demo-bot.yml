@@ -2,7 +2,7 @@
 # More GitHub Actions for Azure: https://github.com/Azure/actions
 # More info on Python, GitHub Actions, and Azure App Service: https://aka.ms/python-webapps-actions
 
-name: Build and deploy Python app to Azure Web App - mindmeta-backend-dev
+name: Build and deploy Python app to Azure Web App - mindmeta-backend-demo-bot
 
 on:
   push:
@@ -68,21 +68,14 @@ jobs:
       - name: Login to Azure
         uses: azure/login@v2
         with:
-          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_38E823DA7919459E8FD69BF7409398FE }}
-          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_709AAC3713924EC7A48A91D258E924B0 }}
-          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_8FE8A5879A6848A6A55B10DC7C7AB5C8 }}
+          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_2955E525DBED47E0B4263D9A5A9C0367 }}
+          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_3E2F409BCCA540C8A67BEF536EC77A8B }}
+          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_33D3FB8FCD2D4BB1903F08CF5FEFA9F1 }}
 
       - name: 'Deploy to Azure Web App'
         uses: azure/webapps-deploy@v3
         id: deploy-to-webapp
         with:
-          app-name: 'mindmeta-backend-dev'
+          app-name: 'mindmeta-backend-demo-bot'
           slot-name: 'Production'
-
-      - name: Send Slack Notification
-        if: success()
-        run: |
-          curl -X POST -H 'Content-type: application/json' \
-            --data '{"text": "🚀 MindMeta AI Backend is LIVE! Our cutting-edge mindmeta-backend has been successfully deployed to Azure Production. Let’s innovate and shape the future of AI!"}' \
-            ${{ secrets.SLACK_WEBHOOK_URL }}
           
