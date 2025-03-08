@@ -60,9 +60,8 @@ state = ConversationState()
 # Azure Speech Config
 speech_config = speechsdk.SpeechConfig(subscription=AZURE_SPEECH_KEY, region=AZURE_REGION)
 speech_config.set_property(speechsdk.PropertyId.Speech_SegmentationSilenceTimeoutMs, "500")
-speech_config.set_speech_synthesis_output_format(
-    speechsdk.SpeechSynthesisOutputFormat.Riff16Khz16BitMonoPcm
-)
+speech_config.set_speech_synthesis_output_format(speechsdk.SpeechSynthesisOutputFormat.Riff16Khz16BitMonoPcm)
+
 
 
 azure_ai_client = AsyncAzureOpenAI(  
@@ -70,7 +69,7 @@ azure_ai_client = AsyncAzureOpenAI(
     api_key=azure_api_key,
     api_version=open_api_version
 )
-
+# --- Create recognizer for audio input ---
 def create_recognizer():
     audio_format = speechsdk.audio.AudioStreamFormat(
         samples_per_second=16000,
@@ -90,7 +89,7 @@ async def websocket_endpoint(websocket: WebSocket):
     patient_id = None
 
     try:
-        # Step 1: Receive patient ID first
+        # Step 1: Receive patient ID from the client.
         init_data = await websocket.receive_json()
         patient_id = init_data.get("patient_id")
         if not patient_id:
@@ -98,43 +97,39 @@ async def websocket_endpoint(websocket: WebSocket):
             await websocket.close()
             return
 
-        # Step 2: Initialize Azure components and patient state.
+        # Step 2: Initialize components and store patient state.
         recognizer, push_stream = create_recognizer()
         state.active_patients[patient_id] = {
             "history": [],
-            "synthesizer": None,
             "recognizer": recognizer,
             "push_stream": push_stream,
             "has_greeted": False,
-            "last_text": ""  # Initialize last_text key
+            "last_text": ""
         }
 
-        # Event handler for recognized speech.
+        # Event handler: store recognized speech text.
         def recognized_handler(evt):
             if evt.result.reason == speechsdk.ResultReason.RecognizedSpeech:
                 text = evt.result.text.strip()
                 if text:
-                    # Store recognized text; using set rather than appending debug strings.
                     state.active_patients[patient_id]["last_text"] = text
 
         recognizer.recognized.connect(recognized_handler)
         recognizer.start_continuous_recognition()
 
-        # Step 3: Process audio chunks.
+        # Step 3: Process incoming audio chunks from the client.
         while True:
             audio_chunk = await websocket.receive_bytes()
             push_stream.write(audio_chunk)
-            # (Optional) Log here if needed.
 
             # Check if recognized text is available.
             last_text = state.active_patients[patient_id].get("last_text", "")
             if last_text:
-                # Safely remove the text so it doesn't get processed twice.
+                # Safely remove the recognized text so it isn’t processed twice.
                 user_text = state.active_patients[patient_id].pop("last_text", "")
-                print("USer text is: ",user_text)
-                response = await generate_response(patient_id, user_text)
-                if response:
-                    await text_to_speech(patient_id, response, websocket)
+                # print("User text is:", user_text)
+                # Stream GPT response directly to TTS.
+                await stream_response_to_tts(patient_id, user_text, websocket)
 
     except Exception as e:
         print(f"[{patient_id}] Error: {str(e)}")
@@ -147,16 +142,58 @@ async def websocket_endpoint(websocket: WebSocket):
             del state.active_patients[patient_id]
         await websocket.close()
 
-async def generate_response(patient_id: str, user_text: str):
+async def stream_response_to_tts(patient_id: str, user_text: str, websocket: WebSocket):
     try:
-        # print("Generating response for:", user_text)
+        state.is_speaking = True
+        state.stop_synthesis.clear()
+
+        # --- Setup TTS using Text Streaming (WebSocket v2 endpoint) ---
+        # IMPORTANT: Must use the websocket v2 endpoint.
+        tts_speech_config = speechsdk.SpeechConfig(
+            endpoint=f"wss://{AZURE_REGION}.tts.speech.microsoft.com/cognitiveservices/websocket/v2",
+            subscription=AZURE_SPEECH_KEY  # Use the appropriate key for TTS.
+        )
+        # Set a supported voice (SSML isn’t supported in text streaming).
+        tts_speech_config.speech_synthesis_voice_name = "en-US-BrianMultilingualNeural"
+
+        # Set extended timeout properties to handle GPT latency.
+        properties = {
+            "SpeechSynthesis_FrameTimeoutInterval": "100000000",
+            "SpeechSynthesis_RtfTimeoutThreshold": "10"
+        }
+        tts_speech_config.set_properties_by_name(properties)
+
+        # Create a PullAudioOutputStream and AudioOutputConfig to capture the audio data instead of local playback.
+        pull_stream = speechsdk.audio.PullAudioOutputStream()
+        audio_config = speechsdk.audio.AudioOutputConfig(stream=pull_stream)
+        tts_synthesizer = speechsdk.SpeechSynthesizer(speech_config=tts_speech_config, audio_config=audio_config)
+
+        # Attach an event handler so that synthesized audio chunks are sent immediately to the frontend.
+        # def synthesizing_handler(evt):
+        #     pass
+            # print("Synthesizing_handle called")
+            # if evt.audio_data:
+            #     print("Audio data length:", len(evt.audio_data), "bytes")
+            #     # Print the first 20 bytes in hex for inspection
+            #     print("First 20 bytes (hex):", evt.audio_data[:20].hex())
+            #     asyncio.create_task(websocket.send_bytes(evt.audio_data))
+        # tts_synthesizer.synthesizing.connect(synthesizing_handler)
+
+        # Create a TTS request with TextStream input type.
+        tts_request = speechsdk.SpeechSynthesisRequest(
+            input_type=speechsdk.SpeechSynthesisRequestInputType.TextStream
+        )
+        # Start TTS synthesis asynchronously (it will wait for text input via tts_request.input_stream).
+        tts_task = tts_synthesizer.speak_async(tts_request)
+
+        # --- Stream GPT response to TTS ---
+        # Prepare conversation history.
         patient = state.active_patients.get(patient_id)
         if not patient:
-            return None
+            return
 
-        # Initial greeting logic
-        if not patient["has_greeted"]:
-            system_prompt = my_system_prompt
+        if not patient.get("has_greeted", False):
+            system_prompt = my_system_prompt  # Your defined system prompt.
             patient["history"] = [
                 {"role": "system", "content": system_prompt},
                 {"role": "assistant", "content": "Hello Pete, I'm Elys..."}
@@ -165,69 +202,44 @@ async def generate_response(patient_id: str, user_text: str):
         else:
             patient["history"].append({"role": "user", "content": user_text})
 
-        # print("Patient history:", patient["history"])
-        # Generate LLM response with streaming.
-        response = await azure_ai_client.chat.completions.create(
+        # Request a GPT streaming response.
+        gpt_response = await azure_ai_client.chat.completions.create(
             model=DEPLOYMENT_NAME,
             messages=patient["history"],
             stream=True
         )
 
         full_response = ""
-        async for chunk in response:
-            # Here chunk is a ChatCompletionChunk object.
+        async for chunk in gpt_response:
             if chunk.choices and len(chunk.choices) > 0:
-                # Use attribute access instead of dictionary get
                 delta = ""
                 if hasattr(chunk.choices[0].delta, "content"):
                     delta = chunk.choices[0].delta.content or ""
                 if delta:
                     full_response += delta
+                    # As soon as a text chunk is received, write it to the TTS input stream.
+                    # print("Sending to TTS:", delta)
+                    tts_request.input_stream.write(delta)
                     if state.stop_synthesis.is_set():
-                        return None
+                        break
 
-        # Update conversation history with the assistant's response.
+        # Signal that no more text is coming.
+        tts_request.input_stream.close()
+
+        # Wait for the TTS synthesis task to complete.
+        result = tts_task.get()
+        if result.reason == speechsdk.ResultReason.SynthesizingAudioCompleted:
+            audio_data = result.audio_data  # This is a bytes object with the complete synthesized audio.
+            # print("Final audio data length:", len(audio_data), "bytes")
+            await websocket.send_bytes(audio_data)
+        else:
+            error_details = result.error_details if result.error_details else "Unknown error"
+            print("Error in TTS:", error_details)
+            await websocket.send_text(f"[ERROR] {error_details}")
+
+        # Append the full GPT response to the conversation history.
         patient["history"].append({"role": "assistant", "content": full_response})
-        # print("LLM response is:", full_response)
-        return full_response
 
-    except Exception as e:
-        print(f"[{patient_id}] LLM error: {str(e)}")
-        return "Let me try that again."
-
-async def text_to_speech(patient_id: str, text: str, websocket: WebSocket):
-    try:
-        # print('At text to speech received text from llm is: ',text)
-        state.is_speaking = True
-        state.stop_synthesis.clear()
-        
-        # Create in-memory audio stream
-        stream = speechsdk.audio.PullAudioOutputStream()
-        audio_config = speechsdk.audio.AudioOutputConfig(stream=stream)
-        synthesizer = speechsdk.SpeechSynthesizer(
-            speech_config=speech_config, 
-            audio_config=audio_config
-        )
-        
-        ssml = f"""<speak version='1.0' xml:lang='en-US'>
-            <voice name='en-US-JennyNeural'>
-                <prosody rate='-20%'>{text}</prosody>
-            </voice>
-        </speak>"""
-        
-        result = await asyncio.to_thread(synthesizer.speak_ssml, ssml)
-        
-        if state.stop_synthesis.is_set():
-            synthesizer.stop_speaking_async()
-            await websocket.send_text("[INTERRUPTED]")
-        elif result.reason == speechsdk.ResultReason.SynthesizingAudioCompleted:
-            audio_data = result.audio_data
-            # Log details about the audio data:
-            # print("Voice sent through websocket")
-            # print(f"Audio data length: {len(audio_data)} bytes")
-            # Print first 20 bytes in hex for inspection:
-            # print("First 20 bytes (hex):", audio_data[:20].hex())
-            await websocket.send_bytes(audio_data)            
     except Exception as e:
         print(f"[{patient_id}] TTS error: {str(e)}")
         await websocket.send_text(f"[ERROR] {str(e)}")
