@@ -39,7 +39,12 @@ OPENAI_BASE_URL = "https://api.openai.com/v1/realtime"
 MODEL = "gpt-4o-mini-realtime-preview-2024-12-17"
 
 
-
+@app.get("/health-check")
+def health_check():
+    try:
+        return {"status": "Good"}
+    except Exception as e:
+        return {"status": "Bad"}
 
 
 @app.post("/start-call")
