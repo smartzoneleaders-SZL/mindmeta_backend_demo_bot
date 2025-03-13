@@ -12,7 +12,7 @@ import os
 from dotenv import load_dotenv
 
 # For loading Pete's dummy data 
-from db.dummy_data import instruction
+# from db.dummy_data import instruction
 
 load_dotenv()
 
@@ -50,6 +50,7 @@ def health_check():
 @app.post("/start-call")
 async def start_call(request: SDPRequest):
     sdp_offer = request.sdp_offer
+    instruction = request.prompt
     if not OPENAI_API_KEY:
         raise HTTPException(status_code=500, detail="Missing OpenAI API key")
 
