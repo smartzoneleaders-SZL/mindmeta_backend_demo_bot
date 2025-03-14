@@ -30,19 +30,3 @@ class Patient(Base):
     hume_voice = Column(String)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
-
-
-    # Relationship to FamilyMember, Chat and Summary
-    carehome = relationship("CareHome", back_populates="patient")
-    family_members = relationship("FamilyMember", back_populates="patient", order_by=asc("created_at"), cascade="all, delete-orphan")
-    chats = relationship("Chat", back_populates="patient", cascade="all, delete-orphan")
-    calls = relationship("Call", back_populates="patient", cascade="all, delete-orphan")
-    call_topic = relationship("CallTopic", back_populates="patient", cascade="all, delete-orphan")
-    summaries = relationship("Summary", back_populates="patient", cascade="all, delete-orphan")
-    scheduled_calls = relationship("ScheduledCall", back_populates="patient", cascade="all, delete-orphan")
-    notifications = relationship("Notification", back_populates="patient", cascade="all, delete-orphan")
-    media_uploads = relationship("MediaUpload", back_populates="patient", cascade="all, delete-orphan")
-    instruction = relationship("Instruction", back_populates="patient", cascade="all, delete-orphan")
-    description = relationship("Description", back_populates="patient", cascade="all, delete-orphan")
-    life_history = relationship("LifeHistory", back_populates="patient", cascade="all, delete-orphan")
-

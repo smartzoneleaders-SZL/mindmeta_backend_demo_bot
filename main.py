@@ -8,6 +8,9 @@ from fastapi.middleware.cors import CORSMiddleware
 # For schemas of endpoints
 from schema.call_bot import SDPRequest
 
+# for the prompt that we will give the model
+from services.preparing_prompt import prepare_prompt
+
 import os
 from dotenv import load_dotenv
 
@@ -50,25 +53,26 @@ def health_check():
 @app.post("/start-call")
 async def start_call(request: SDPRequest):
     sdp_offer = request.sdp_offer
-    instruction = request.prompt
+    patient_id = request.patient_id
     if not OPENAI_API_KEY:
         raise HTTPException(status_code=500, detail="Missing OpenAI API key")
-
+    # print("Patient_id is: ",patient_id)
+    instructions = prepare_prompt(patient_id)
     # Build the URL with model and instructions passed as query parameters.
     # Use urllib.parse.quote to ensure proper URL-encoding of the instructions.
-    query_params = f"?model={MODEL}&instructions={quote(instruction)}"
+    query_params = f"?model={MODEL}&instructions={quote(instructions)}"
     url = f"{OPENAI_BASE_URL}{query_params}"
 
     headers = {
         "Authorization": f"Bearer {OPENAI_API_KEY}",
-        "Content-Type": "application/sdp",  # The SDP offer must be sent as raw SDP.
+        "Content-Type": "application/sdp",  
     }
 
     async with httpx.AsyncClient() as client:
         # Send the SDP offer along with the query parameters.
         response = await client.post(url, headers=headers, data=sdp_offer)
-        print("Print repponse is: ",response.text)
-        print("Print response status: ",response.status_code)
+        # print("Print repponse is: ",response.text)
+        # print("Print response status: ",response.status_code)
         if response.status_code != 200 or response.status_code != 201:
             raise HTTPException(
                 status_code=response.status_code,

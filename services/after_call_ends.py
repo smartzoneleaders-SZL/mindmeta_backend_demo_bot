@@ -39,7 +39,7 @@ async def upload_chat_hisory(patient_id ,call_id, messages):
         sentiment_analysis = check_sentiment_using_textblob(human_messages)
         carehome_id = get_carehome_id_from_patient_id(patient_id)
         if(carehome_id is None):
-            print("Carehome id is None")
+            # print("Carehome id is None")
             return False
         sentiment_analysis_apended = append_sentiment_analysis_value(dict_chat,sentiment_analysis)
         did_upload = await upload_on_mongodb(patient_id, call_id, sentiment_analysis_apended)
@@ -94,7 +94,7 @@ def parse_chat_history(messages):
                     "completion_tokens": token_usage.get("completion_tokens", 0)
                 })
                 current_human = None  
-    print(parsed_chats)
+    # print(parsed_chats)
     return parsed_chats
 
 
