@@ -9,8 +9,8 @@ from services.sentiment_analysis import check_sentiment_using_textblob
 from utils.utils import append_sentiment_analysis_value
 
 # For getting carehome id from patient id in postgresql
-from services.postgres import get_carehome_id_from_patient_id
-
+# For updating status to completed after the call
+from services.postgres import get_carehome_id_from_patient_id, did_change_status_to_completed
 
 def list_to_dict(lst):
     conversation = []
@@ -101,6 +101,24 @@ def parse_chat_history(messages):
 
 def get_human_messages_out_of_call_chat(messages):
     return " ".join(message["human"] for message in messages if "human" in message)
+
+
+
+# Change the status of the schedule call from 'schedule' to 'completed'
+def change_call_status_to_completed(patient_id):
+    """This function gets called when a scheduled call ends and now we have to change its status
+    INPUT:
+        - patient_id
+    OUTPUT:
+        - True
+        - If there is a problem an Error will be raised (raise)"""
+    try:
+        did_change = did_change_status_to_completed(patient_id)
+        if did_change:
+            return True
+    except Exception as e:
+        print("change_call_status_to_completed in after_call_ends.py  in services -> ",str(e))
+        raise
 
     
 

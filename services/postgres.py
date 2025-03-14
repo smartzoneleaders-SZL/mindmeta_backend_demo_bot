@@ -86,5 +86,30 @@ def get_current_call_title_description(patient_id: str) ->str:
         return what_to_talk.title, what_to_talk.description
     except Exception as e:
         print("Error in get_current_call_title_description inside postgres in services -> ",str(e))
-        raise        
+        raise      
+
+
+
+def did_change_status_to_completed(patient_id:str)->str:
+    """This function gets called when a scheduled call ends and now we have to change its status
+    INPUT:
+        - patient_id
+    OUTPUT:
+        - True
+        - If there is a problem an Error will be raised (raise)""" 
+    try:
+        db = next(get_db())
+        status_change = db.query(ScheduledCall).filter(
+                        ScheduledCall.patient_id == patient_id,
+                        ScheduledCall.status == "scheduled").update({"status": "completed"}, synchronize_session=False)
+        if status_change != 1:
+            print('Critical error')
+            print(status_change)
+            
+        db.commit()
+        return True
+    except Exception as e:
+        print("Error in postgres while changing status -> ",str(e))
+        raise
+
 

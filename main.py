@@ -6,7 +6,7 @@ import uvicorn
 from fastapi.middleware.cors import CORSMiddleware
 
 # For schemas of endpoints
-from schema.call_bot import SDPRequest
+from schema.call_bot import SDPRequest, RequestData
 
 # for the prompt that we will give the model
 from services.preparing_prompt import prepare_prompt
@@ -15,7 +15,7 @@ import os
 from dotenv import load_dotenv
 
 # For loading Pete's dummy data 
-# from db.dummy_data import instruction
+from db.dummy_data import instructions
 
 load_dotenv()
 
@@ -53,11 +53,11 @@ def health_check():
 @app.post("/start-call")
 async def start_call(request: SDPRequest):
     sdp_offer = request.sdp_offer
-    patient_id = request.patient_id
+    # patient_id = request.patient_id
     if not OPENAI_API_KEY:
         raise HTTPException(status_code=500, detail="Missing OpenAI API key")
     # print("Patient_id is: ",patient_id)
-    instructions = prepare_prompt(patient_id)
+    # instructions = prepare_prompt(patient_id)
     # Build the URL with model and instructions passed as query parameters.
     # Use urllib.parse.quote to ensure proper URL-encoding of the instructions.
     query_params = f"?model={MODEL}&instructions={quote(instructions)}"
@@ -85,18 +85,26 @@ async def start_call(request: SDPRequest):
 from utils.utils import generate_uuid
 
 # for uploading chat
-from services.after_call_ends import upload_chat_hisory
+# for changing the status
+from services.after_call_ends import upload_chat_hisory, change_call_status_to_completed
 
 @app.post("/call-with-bot-end")
-def upload_call_data_on_mongodb(patient_id:str):
+def upload_call_data_on_mongodb(request :RequestData):
     try:
+        patient_id= request.patient_id
         call_id = generate_uuid()
         messages = ["Hi i am Sarab", "Hello sarab, how are you today", "I am not feeling very good", "whats the problem sarab", "i am feeling very lonely" ]
-        did_upload = upload_chat_hisory(patient_id , call_id, messages)
-        if did_upload:
-            return {"sucess":True, "details": "chat history upload on mongoDB"}
-        else:
-            return {"sucess": False, "details": " "}
+
+        # Now because the call has ended, we need to change the status from 'schedule' to 'completed'
+        did_change = change_call_status_to_completed(patient_id)
+        if did_change:
+            return {"sucess": True, "details": " "}
+        
+        # did_upload = upload_chat_hisory(patient_id , call_id, messages)
+        # if did_upload and did_change:
+        #     return {"sucess":True, "details": "chat history upload and schedule call status changed"}
+        # else:
+        #     return {"sucess": False, "details": " "}
     except Exception as e:
         print("Error in call_with_bot_end in main.py -> ",str(e))
         raise
@@ -104,4 +112,4 @@ def upload_call_data_on_mongodb(patient_id:str):
 
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=80)
