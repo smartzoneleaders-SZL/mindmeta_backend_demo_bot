@@ -1,5 +1,5 @@
 from db.mongo_db import db
-
+from datetime import datetime
 
 
 
@@ -7,7 +7,7 @@ from db.mongo_db import db
 import logging
 logger = logging.getLogger(__name__)
 
-async def upload_on_mongodb(patient_id: str, call_id, new_chats: list) -> int:
+async def upload_list_on_mongodb(patient_id: str, call_id, new_chats: list) -> int:
     """
     Appends new chat items to a dynamic field (named by call_id) in the document 
     associated with a given patient_id.
@@ -44,3 +44,60 @@ async def upload_on_mongodb(patient_id: str, call_id, new_chats: list) -> int:
         logger.error("Error in upload_on_mongodb: %s", str(e))
         raise
 
+
+
+async def upload_on_mongodb(patient_id: str, call_id: str, data_to_upload: dict) -> int:
+    """
+    Updates (or creates) a document for the given patient. The document will have:
+      - _id: randomly generated ObjectId (by MongoDB)
+      - patient_id: the given patient_id
+      - carehome_id: the given carehome_id (from data_to_upload)
+      - calls: an array in which each element is an object with:
+            {
+                "call_id": <call_id>,
+                "human_messages": <messages>,
+                "sentiment_analysis": <sentiment_analysis>
+            }
+    
+    If a document for the given patient_id exists, the function pushes a new call object onto the calls array.
+    Otherwise, it creates a new document with the provided fields.
+    
+    Args:
+        patient_id (str): The patient’s identifier.
+        call_id (str): The call identifier.
+        data_to_upload (dict): Should contain:
+            - "human_messages": the messages text,
+            - "sentiment_analysis": the sentiment analysis,
+            - "carehome_id": the care home identifier.
+    
+    Returns:
+        int: The number of documents modified.
+    """
+    try:
+        # Filter: find document by patient_id
+        filter_query = {"patient_id": patient_id}
+        
+        # Build the call object to insert
+        new_call = {
+            "call_id": call_id,
+            "human_messages": data_to_upload.get("human_messages"),
+            "sentiment_analysis": data_to_upload.get("sentiment_analysis"),
+            "call_time": datetime.utcnow()
+        }
+        
+        # Update: push new call into the 'calls' array.
+        # $setOnInsert sets patient_id and carehome_id if the document is created.
+        update_query = {
+            "$push": {"calls": new_call},
+            "$setOnInsert": {
+            "patient_id": patient_id,
+            "carehome_id": data_to_upload.get("carehome_id")}}
+
+    
+        # Use upsert=True to create a new document if one does not exist.
+        result = await db.chats.update_one(filter_query, update_query, upsert=True)
+        logger.info("Document updated for patient_id: %s with call_id: %s", patient_id, call_id)
+        return result.modified_count
+    except Exception as e:
+        logger.error("Error in upload_on_mongodb: %s", str(e))
+        raise

@@ -3,6 +3,9 @@ from urllib.parse import quote_plus
 import motor.motor_asyncio
 from dotenv import load_dotenv
 
+# For uuid standard: 
+from bson.binary import STANDARD
+
 
 load_dotenv()
 username = os.getenv('MONGODB_URI_USERNAME')
@@ -19,5 +22,6 @@ print(MONGO_URI)
 print(db_name)
 
 # Create the Motor client
-client = motor.motor_asyncio.AsyncIOMotorClient(MONGO_URI)
+client = motor.motor_asyncio.AsyncIOMotorClient(MONGO_URI, uuidRepresentation="standard")
+
 db = client[db_name]

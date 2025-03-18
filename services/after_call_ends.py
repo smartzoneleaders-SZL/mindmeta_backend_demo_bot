@@ -8,6 +8,16 @@ from services.sentiment_analysis import check_sentiment_using_textblob
 # For append_sentiment_analysis_value 
 from utils.utils import append_sentiment_analysis_value
 
+
+# For sending emails
+from services.send_email import send_email_alert
+# prevent sucide using openai by reading messages
+from services.prevent_suicide import detect_harmful_line
+
+# To get carehome email
+from services.postgres import get_carehome_email
+
+
 # For getting carehome id from patient id in postgresql
 # For updating status to completed after the call
 from services.postgres import get_carehome_id_from_patient_id, did_change_status_to_completed
@@ -34,19 +44,23 @@ async def upload_chat_hisory(patient_id ,call_id, messages):
         - history in langhchain object which contains role, token amount, message etc 
     """
     try:
-        dict_chat=list_to_dict(messages)
-        human_messages = get_human_messages_out_of_call_chat(dict_chat)
-        sentiment_analysis = check_sentiment_using_textblob(human_messages)
+        is_done = check_chat_for_possible_word(messages,patient_id)
+        print("Messages are: ", messages)
+        # dict_chat=list_to_dict(messages)
+        # human_messages = get_human_messages_out_of_call_chat(dict_chat)
+        sentiment_analysis = check_sentiment_using_textblob(messages)
         carehome_id = get_carehome_id_from_patient_id(patient_id)
         if(carehome_id is None):
             # print("Carehome id is None")
             return False
-        sentiment_analysis_apended = append_sentiment_analysis_value(dict_chat,sentiment_analysis)
-        did_upload = await upload_on_mongodb(patient_id, call_id, sentiment_analysis_apended)
+        data_to_upload = {"human_messages" : messages, "sentiment_analysis": sentiment_analysis, "carehome_id": carehome_id}
+        # sentiment_analysis_apended = append_sentiment_analysis_value(dict_chat,sentiment_analysis)
+        did_upload = await upload_on_mongodb(patient_id, call_id, data_to_upload)
         # print("History is: ",state_snapshot.values["messages"])
         if did_upload:
             return True
         else:
+            print("Error while uploading data on mongodb")
             return False
     except Exception as e:
         print("Error in get_chat_history function: ",str(e))
@@ -119,6 +133,26 @@ def change_call_status_to_completed(patient_id):
     except Exception as e:
         print("change_call_status_to_completed in after_call_ends.py  in services -> ",str(e))
         raise
+
+
+
+
+
+
+# Check user messages if user messages contain any dangerous words
+def check_chat_for_possible_word(messages, patient_id):
+
+    suspected_line = detect_harmful_line(messages)
+    print("Model output: ",suspected_line)
+    carehome_email = get_carehome_email(patient_id)
+    print("Carehome email to pass is: ",carehome_email)
+    if suspected_line:
+        did_send = send_email_alert(suspected_line, carehome_email)
+        return did_send
+    return True
+    
+    
+
 
     
 

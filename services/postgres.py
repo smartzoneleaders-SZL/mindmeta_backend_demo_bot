@@ -4,9 +4,11 @@ from model.patient import Patient
 from model.summary import Summary
 from model.life_history import LifeHistory
 from model.schedule_call import ScheduledCall
+from model.care_home import CareHome
 
 # For getting postgresql db 
 from db.postgres import get_db
+
 
 
 def get_carehome_id_from_patient_id(patient_id: str) -> str:
@@ -111,5 +113,39 @@ def did_change_status_to_completed(patient_id:str)->str:
     except Exception as e:
         print("Error in postgres while changing status -> ",str(e))
         raise
+
+
+def get_time_from_schedule_call_using_patient_id(patient_id):
+    """Get time of scheduled call in seconds"""
+    try:
+        db= next(get_db())
+        time = (db.query(ScheduledCall.call_duration).filter(ScheduledCall.patient_id == patient_id, ScheduledCall.status == "scheduled").first())
+
+        call_duration = time[0] if time else False
+
+        print(call_duration)
+        if call_duration:
+            return call_duration
+        else:
+            print("Call duration is none that's what the db sent")
+            raise
+    
+    except Exception as e:
+        print("Error on get_time_from_schedule_call_using_patient_id in postgres.py -> ",str(e))
+        raise
+
+
+
+def get_carehome_email(patient_id):
+    """To get carehome email from patient_id. This is so we can send carehome email,
+        when user show suicidal thoughts"""
+    try:
+        db = next(get_db())
+        carehome_email = db.query(CareHome.email) .join(Patient, CareHome.id == Patient.carehome_id).filter(Patient.id == patient_id).scalar()
+        print("carehome email is: ",carehome_email)
+        return carehome_email
+    except Exception as e:
+        print("Error while getiitng carehome email in -> get_carehome_email function in postgres",str(e))
+    
 
 
