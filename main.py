@@ -6,7 +6,7 @@ import uvicorn
 from fastapi.middleware.cors import CORSMiddleware
 
 # For schemas of endpoints
-from schema.call_bot import SDPRequest, RequestData
+from schema.call_bot import SDPRequest, RequestData, CallYourBot
 
 # for the prompt that we will give the model
 from services.preparing_prompt import prepare_prompt
@@ -198,6 +198,38 @@ async def websocket_endpoint(websocket: WebSocket):
         except RuntimeError:
             print("WebSocket already closed.")
 
+
+@app.post("/start-call-yourself")
+async def start_call(request: CallYourBot):
+    sdp_offer = request.sdp_offer
+    instructions =request.prompt
+    # print("User prompt is: ",instructions)
+    # patient_id = request.patient_id
+    if not OPENAI_API_KEY:
+        raise HTTPException(status_code=500, detail="Missing OpenAI API key")
+    # Build the URL with model and instructions passed as query parameters.
+    # Use urllib.parse.quote to ensure proper URL-encoding of the instructions.
+    query_params = f"?model={MODEL}&instructions={quote(instructions)}"
+    url = f"{OPENAI_BASE_URL}{query_params}"
+
+    headers = {
+        "Authorization": f"Bearer {OPENAI_API_KEY}",
+        "Content-Type": "application/sdp",  
+    }
+
+    async with httpx.AsyncClient() as client:
+        # Send the SDP offer along with the query parameters.
+        response = await client.post(url, headers=headers, data=sdp_offer)
+        # print("Print repponse is: ",response.text)
+        # print("Print response status: ",response.status_code)
+        if response.status_code != 200 or response.status_code != 201:
+            print("Entered here")
+            raise HTTPException(
+                status_code=response.status_code,
+                detail={"sdp_answer": response.text}
+            )
+    
+    return {"sdp_answer": response.text}
 
 
 

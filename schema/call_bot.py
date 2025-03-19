@@ -7,3 +7,7 @@ class SDPRequest(BaseModel):
 
 class RequestData(BaseModel):
     patient_id:str
+
+class CallYourBot(BaseModel):
+    sdp_offer: str
+    prompt: str
