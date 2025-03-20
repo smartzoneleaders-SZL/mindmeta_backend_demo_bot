@@ -6,7 +6,7 @@ from email.mime.multipart import MIMEMultipart
 import os
 
 # Function to send email alert
-def send_email_alert(suspected_message, recipient_email):
+def send_email_alert(recipient_email,subject,body):
     sender_email = os.getenv('EMAIL_SENDER')
     sender_password = os.getenv('EMAIL_PASSWORD')
 
@@ -17,16 +17,6 @@ def send_email_alert(suspected_message, recipient_email):
         raise ValueError("Recipient email is missing or None")
 
     print(f"📧 Sending email from {sender_email} to {recipient_email}")  # Debugging
-
-    subject = "Urgent: Concerning Message Detected"
-    body = f"""
-    Warning: A concerning message was detected that may indicate self-harm or harm to others.
-    
-    Suspected message:
-    "{suspected_message}"
-
-    Please check on the user immediately.
-    """
 
     msg = MIMEMultipart()
     msg["From"] = sender_email

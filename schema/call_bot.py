@@ -11,3 +11,4 @@ class RequestData(BaseModel):
 class CallYourBot(BaseModel):
     sdp_offer: str
     prompt: str
+    voice_name: str

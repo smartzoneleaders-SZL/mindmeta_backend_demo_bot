@@ -147,7 +147,16 @@ def check_chat_for_possible_word(messages, patient_id):
     carehome_email = get_carehome_email(patient_id)
     print("Carehome email to pass is: ",carehome_email)
     if suspected_line:
-        did_send = send_email_alert(suspected_line, carehome_email)
+        subject = "Urgent: Concerning Message Detected"
+        body = f"""
+        Warning: A concerning message was detected that may indicate self-harm or harm to others.
+    
+        Suspected message:
+        "{suspected_line}"
+
+        Please check on the user immediately.
+        """
+        did_send = send_email_alert(carehome_email,subject,body)
         return did_send
     return True
     

@@ -22,6 +22,9 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 import uuid
 import asyncio
 
+# For routers
+from routes import auth, allow_access
+
 
 import os
 from dotenv import load_dotenv
@@ -198,18 +201,36 @@ async def websocket_endpoint(websocket: WebSocket):
         except RuntimeError:
             print("WebSocket already closed.")
 
+# voice_option = "sage"
 
+
+# "alloy"
+# "ash"
+# "ballad"
+# "coral"
+# "echo"
+# "sage"
+# "shimmer"
+# "verse"
 @app.post("/start-call-yourself")
 async def start_call(request: CallYourBot):
     sdp_offer = request.sdp_offer
     instructions =request.prompt
+    voice_option = request.voice_name
+
     # print("User prompt is: ",instructions)
     # patient_id = request.patient_id
     if not OPENAI_API_KEY:
         raise HTTPException(status_code=500, detail="Missing OpenAI API key")
     # Build the URL with model and instructions passed as query parameters.
     # Use urllib.parse.quote to ensure proper URL-encoding of the instructions.
-    query_params = f"?model={MODEL}&instructions={quote(instructions)}"
+    query_params = (
+        f"?model={MODEL}"
+        f"&instructions={quote(instructions)}"
+        f"&voice={quote(voice_option)}"
+        f"&cache=true"         # Enable caching
+        # f"&cache_level=1"    # Optionally set cache level (if supported)
+    )
     url = f"{OPENAI_BASE_URL}{query_params}"
 
     headers = {
@@ -230,6 +251,13 @@ async def start_call(request: CallYourBot):
             )
     
     return {"sdp_answer": response.text}
+
+
+
+
+app.include_router(auth.router, prefix="/api/register", tags=["Register"])
+app.include_router(allow_access.router, prefix="/api/allow-access", tags=["Allow Access"])
+
 
 
 

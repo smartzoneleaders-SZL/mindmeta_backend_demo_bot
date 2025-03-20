@@ -1,13 +1,21 @@
-
+from fastapi import HTTPException
 # Postgres Models
 from model.patient import Patient
 from model.summary import Summary
 from model.life_history import LifeHistory
 from model.schedule_call import ScheduledCall
 from model.care_home import CareHome
+from model.demo_access import DemoAccess
 
 # For getting postgresql db 
 from db.postgres import get_db
+
+# To check the 48 hours access of demo user
+from datetime import datetime, timezone
+
+
+
+
 
 
 
@@ -148,4 +156,38 @@ def get_carehome_email(patient_id):
         print("Error while getiitng carehome email in -> get_carehome_email function in postgres",str(e))
     
 
+
+def create_new_demo_access(email, name, phone_number):
+    """To create demo access in postgress"""
+    try:
+        db = next(get_db())
+        new_user = DemoAccess(
+        name=name,
+        email=email,
+        phone_number=phone_number)
+        db.add(new_user)
+        db.commit()
+        return True
+    except Exception as e:
+        print("Error on database is: ",str(e))
+        raise
+
+def validate_user(user_email: str):
+    try:
+        db = next(get_db())
+        user = db.query(DemoAccess).filter(DemoAccess.email == user_email).first()
+        print("User is: ", user)
+        if user is None:
+            return False
+        if not user:
+            return HTTPException(status_code=403, detail="User not authorized.")
+
+        current_time = datetime.now(timezone.utc)
+        if current_time > user.access_upto:
+            return HTTPException(status_code=403, detail="Access expired.")
+
+        return True
+    except Exception as e:
+        print("Error in postgres services: ", str(e))
+        return HTTPException(status_code=500, detail="Error in db")
 
