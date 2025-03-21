@@ -41,7 +41,7 @@ def register_for_access(request: RegisterAccess):
                     Click the link below to send allow them.
                     {access_link}
             """
-            did_send_email = send_email_alert("devsarab01@gmail.com",subject,body)
+            did_send_email = send_email_alert("nawazabdullah1800@gmail.com",subject,body)
             if did_send_email:
                 return JSONResponse(content={"request_sent": True, "detail": "Your request for demo bot has been sent. Please be patient. Your request will be granted soon"}, status_code=200)
             else:
