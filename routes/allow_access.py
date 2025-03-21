@@ -5,7 +5,7 @@ from fastapi.responses import JSONResponse
 from services.custom_link import decode_token
 
 # for creating new demo user
-from services.postgres import create_new_demo_access
+from services.postgres import grant_access_by_email
 
 # For sendinf confirmation email to the carehome
 from services.send_email import send_email_alert
@@ -19,7 +19,7 @@ def allow_demo_access(encoded_data: str):
         decoded = decode_token(encoded_data)
         print(decoded['email'])
         if decoded['allow_access']:
-            did_upload = create_new_demo_access(decoded["email"], decoded["name"], decoded["phone_number"])
+            did_upload = grant_access_by_email(decoded["email"])
             if did_upload:
                 subject ="Your Request for demo bot has been granted"
                 body = "Hi please go back to the login"
@@ -29,7 +29,7 @@ def allow_demo_access(encoded_data: str):
                 else:
                     return JSONResponse(content={"status": False, "detail": "Couldn't send email"})
             else:
-                return JSONResponse(content={"status": False, "detail": "Database Error"}, status_code=400)
+                return JSONResponse(content={"status": False, "detail": "user doesn't exist which is impossible"}, status_code=400)
         else: 
             return JSONResponse(content={"status": False, "detail": "Bad Link"}, status_code=400) 
     except Exception as e:

@@ -1,6 +1,5 @@
 from fastapi import FastAPI, HTTPException
 import httpx
-import json
 from urllib.parse import quote
 import uvicorn
 from fastapi.middleware.cors import CORSMiddleware
@@ -23,7 +22,7 @@ import uuid
 import asyncio
 
 # For routers
-from routes import auth, allow_access
+from routes import auth, allow_access, call_bot
 
 
 import os
@@ -212,51 +211,14 @@ async def websocket_endpoint(websocket: WebSocket):
 # "sage"
 # "shimmer"
 # "verse"
-@app.post("/start-call-yourself")
-async def start_call(request: CallYourBot):
-    sdp_offer = request.sdp_offer
-    instructions =request.prompt
-    voice_option = request.voice_name
-
-    # print("User prompt is: ",instructions)
-    # patient_id = request.patient_id
-    if not OPENAI_API_KEY:
-        raise HTTPException(status_code=500, detail="Missing OpenAI API key")
-    # Build the URL with model and instructions passed as query parameters.
-    # Use urllib.parse.quote to ensure proper URL-encoding of the instructions.
-    query_params = (
-        f"?model={MODEL}"
-        f"&instructions={quote(instructions)}"
-        f"&voice={quote(voice_option)}"
-        f"&cache=true"         # Enable caching
-        # f"&cache_level=1"    # Optionally set cache level (if supported)
-    )
-    url = f"{OPENAI_BASE_URL}{query_params}"
-
-    headers = {
-        "Authorization": f"Bearer {OPENAI_API_KEY}",
-        "Content-Type": "application/sdp",  
-    }
-
-    async with httpx.AsyncClient() as client:
-        # Send the SDP offer along with the query parameters.
-        response = await client.post(url, headers=headers, data=sdp_offer)
-        # print("Print repponse is: ",response.text)
-        # print("Print response status: ",response.status_code)
-        if response.status_code != 200 or response.status_code != 201:
-            print("Entered here")
-            raise HTTPException(
-                status_code=response.status_code,
-                detail={"sdp_answer": response.text}
-            )
-    
-    return {"sdp_answer": response.text}
 
 
 
 
-app.include_router(auth.router, prefix="/api/register", tags=["Register"])
+
+app.include_router(auth.router, prefix="/api/auth", tags=["AUTH"])
 app.include_router(allow_access.router, prefix="/api/allow-access", tags=["Allow Access"])
+app.include_router(call_bot.router, prefix="/api/call_bot", tags=["Call_bot"])
 
 
 

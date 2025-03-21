@@ -164,30 +164,112 @@ def create_new_demo_access(email, name, phone_number):
         new_user = DemoAccess(
         name=name,
         email=email,
-        phone_number=phone_number)
+        phone_number=phone_number, total_time = 0)
         db.add(new_user)
         db.commit()
         return True
     except Exception as e:
         print("Error on database is: ",str(e))
-        raise
+        raise HTTPException(status_code=500, detail="Error while creating user")
 
 def validate_user(user_email: str):
     try:
         db = next(get_db())
         user = db.query(DemoAccess).filter(DemoAccess.email == user_email).first()
-        print("User is: ", user)
+        print("USer is: ",user)
         if user is None:
-            return False
-        if not user:
-            return HTTPException(status_code=403, detail="User not authorized.")
+            raise HTTPException(status_code=404, detail="User not found, please register first")
+        if user is not None:
+            if user.access is False:
+                raise HTTPException(status_code=403, detail="Your request hasn't been accepted yet by the admin.")
 
-        current_time = datetime.now(timezone.utc)
-        if current_time > user.access_upto:
-            return HTTPException(status_code=403, detail="Access expired.")
+            current_time = datetime.now(timezone.utc)
+            if current_time > user.access_upto:
+                raise HTTPException(status_code=403, detail="Access expired.")
 
-        return True
+            return True
+    except HTTPException as he:
+        # Propagate HTTPException without modification.
+        raise he
     except Exception as e:
         print("Error in postgres services: ", str(e))
-        return HTTPException(status_code=500, detail="Error in db")
+        raise HTTPException(status_code=500, detail="Error in db")
+    
 
+def does_user_exist(email: str):
+    """ To check if a user already exist using its email
+    INPUT:
+        - user email
+    OUTPUT:
+        - False: if user doesn't exist
+        - True: if user does exist"""
+    try:
+        db = next(get_db())
+        does_exist = db.query(DemoAccess).filter(DemoAccess.email == email).first()
+        if does_exist is None:
+            return False
+        else:
+            return True
+        
+    except Exception as e:
+        print("Error in does user exist: ",str(e))
+        raise HTTPException(status_code=500,detail={"details": "Error while checking if user already exist"})
+    
+
+
+
+
+def grant_access_by_email(email: str):
+    """TO give access to user, this function will put True in False's place in access column of demo user"""
+    db = next(get_db())
+    user = db.query(DemoAccess).filter(DemoAccess.email == email, DemoAccess.access == False).first()
+    
+    if user:
+        user.access = True  # Update the access field
+        db.commit()  # Commit the changes
+        db.refresh(user)  # Refresh the session
+        return True  # Return the updated user object
+    else:
+        return False
+    
+
+
+
+def update_time_of_call(db,email: str, time: int):
+    """Update this call time with the previous so user won't surpass the 30 min time"""
+    try:
+        user = db.query(DemoAccess).filter(DemoAccess.email == email).first()
+        if user is None:
+            raise HTTPException(status_code=404, detail="User not found (which is impossible)")
+        if user.access:
+            updated_time = user.total_time + time
+            user.total_time = updated_time  
+            db.commit()  
+            db.refresh(user)
+            return True
+        else:
+            raise HTTPException(status_code=400, detail="User doesn't have access yet, access hasn't been granted by the admin")
+    except HTTPException as ht:
+        raise ht
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Error occured while updating database time")
+
+
+
+def is_user_eligible_for_call(db, email: str):
+    try:
+        user = db.query(DemoAccess).filter(DemoAccess.email == email).first()
+        if user is None:
+            raise HTTPException(status_code=404, detail="user not found")
+        if user.access:
+            if user.total_time < 1800:
+                return True, user.total_time
+            else:
+                return False, 1800
+        else:
+            raise HTTPException(status_code=400, detail="User doesn't have access")
+    except HTTPException as hp:
+        raise hp
+    except Exception as e:
+        print("Error in eligibility is: ",str(e))
+        raise HTTPException(status_code=500, detail="An Error has occured while checking eligibility")
