@@ -35,13 +35,13 @@ def register_for_access(request: RegisterAccess):
         print("did_create: ",did_create)
         if did_create:
             encoded_data = generate_token(request.name, request.email, request.phone_number)
-            access_link = f"http://192.168.100.49:8000/api/allow-access/allow-demo-access/{encoded_data}"
+            access_link = f"https://mindmeta-backend-demo-bot-speech-to-speech-hrbtazh7c6ghewe2.uksouth-01.azurewebsites.net/api/allow-access/allow-demo-access/{encoded_data}"
             subject = "Someone is requesting for the demo of the bot"
             body = f"""Hi Kamran, {request.name} is asking for the access to the demo bot under email id: {request.email}
                     Click the link below to send allow them.
                     {access_link}
             """
-            did_send_email = send_email_alert("nawazabdullah1800@gmail.com",subject,body)
+            did_send_email = send_email_alert("misterkay78@gmail.com",subject,body)
             if did_send_email:
                 return JSONResponse(content={"request_sent": True, "detail": "Your request for demo bot has been sent. Please be patient. Your request will be granted soon"}, status_code=200)
             else:
