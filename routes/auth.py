@@ -12,13 +12,17 @@ from services.custom_link import generate_token
 from services.send_email import send_email_alert
 
 # Check postgres db to verify 48 hours demo user
-from services.postgres import validate_user
+from services.postgres import is_user_eligible_for_call, validate_user
 
 # check if user already exist in out database   and create a demo user
-from services.postgres import does_user_exist, create_new_demo_access
+from services.postgres import does_user_exist, create_new_demo_access, delete_user_from_db
 
 from fastapi import HTTPException
 
+# for db
+from fastapi import Depends
+from sqlalchemy.orm import Session
+from db.postgres import get_db
 
 router = APIRouter()
 
@@ -56,11 +60,17 @@ def register_for_access(request: RegisterAccess):
 
 
 @router.post("/login")
-def login(request: LoginRequest):
+def login(request: LoginRequest, db: Session = Depends(get_db)):
     """To login user and verify the user access"""
     try:
         validated = validate_user(request.email)
-        return JSONResponse(content={"access": validated, "details": " "}, status_code=200)
+        if(validated):
+            is_eligible, total_time = is_user_eligible_for_call(db, request.email)
+            if is_eligible:
+                return JSONResponse(content={"access": True, "detail": ""}, status_code=200)
+            else:
+                delete_user_from_db(request.email)
+                return JSONResponse(content={"access": False, "detail": "Demo time (30 minutes) used. Please register again to continue."}, status_code=403)
     except HTTPException as http_exc:
         # Extract details and status code from the HTTPException.
         return JSONResponse(content={"detail": http_exc.detail}, status_code=http_exc.status_code)
