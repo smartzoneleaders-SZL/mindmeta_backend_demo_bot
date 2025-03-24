@@ -18,6 +18,7 @@ from services.postgres import is_user_eligible_for_call, validate_user
 from services.postgres import does_user_exist, create_new_demo_access, delete_user_from_db
 
 from fastapi import HTTPException
+import os
 
 # for db
 from fastapi import Depends
@@ -30,22 +31,20 @@ router = APIRouter()
 def register_for_access(request: RegisterAccess):
     """To send email to admin for 48 hour demo access of the bot"""
     try:
-        print("entered")
         user =  does_user_exist(request.email)
-        print("USer is: ",user)
         if user:
             return JSONResponse(content={"request_sent": False, "detail": "User already exist"},status_code=409)
         did_create = create_new_demo_access(request.email,request.name,request.phone_number)
         print("did_create: ",did_create)
         if did_create:
             encoded_data = generate_token(request.name, request.email, request.phone_number)
-            access_link = f"http://192.168.100.49:8000/api/allow-access/allow-demo-access/{encoded_data}"
+            access_link = f"{os.getenv('BACKEND_LINK')}/api/allow-access/allow-demo-access/{encoded_data}"
             subject = "Someone is requesting for the demo of the bot"
             body = f"""Hi Kamran, {request.name} is asking for the access to the demo bot under email id: {request.email}
                     Click the link below to send allow them.
                     {access_link}
             """
-            did_send_email = send_email_alert("darsarab421@gmail.com",subject,body)
+            did_send_email = send_email_alert(os.getenv('ADMIN_EMAIL'),subject,body)
             if did_send_email:
                 return JSONResponse(content={"request_sent": True, "detail": "Your request for demo bot has been sent. Please be patient. Your request will be granted soon"}, status_code=200)
             else:
