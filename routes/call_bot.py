@@ -52,7 +52,8 @@ async def start_call(request: CallYourBot, db: Session = Depends(get_db)):
         instructions =request.prompt
         voice_option = request.voice_name
 
-        user_eligibility, total_time = is_user_eligible_for_call(db, request.email)
+        user_eligibility, remaining_time = is_user_eligible_for_call(db, request.email)
+        print("user_eligibility ",user_eligibility)
         if user_eligibility:
     # print("User prompt is: ",instructions)
     # patient_id = request.patient_id
@@ -74,18 +75,20 @@ async def start_call(request: CallYourBot, db: Session = Depends(get_db)):
                 "Authorization": f"Bearer {os.getenv('OPENAI_API_KEY')}",
                 "Content-Type": "application/sdp",  
             }
+            print("here !!")
 
             async with httpx.AsyncClient() as client:
             # Send the SDP offer along with the query parameters.
                 response = await client.post(url, headers=headers, data=sdp_offer)
-        # print("Print response status: ",response.status_code)
                 if response.status_code == 200 or response.status_code == 201:
                     return JSONResponse(
                         status_code=response.status_code,
-                        content={"sdp_answer": response.text,"total_time": total_time}
+                        content={"sdp_answer": response.text,"remaining_time": remaining_time}
                     )
                 else:
                     return JSONResponse(status_code=500, content={"detail":"An Error occured"})
+        else:
+            return JSONResponse(status_code=404, content={"detail": "Not eligible"})
     except Exception as e:
         print("Error as: ", str(e))
         raise

@@ -12,4 +12,4 @@ class DemoAccess(Base):
     access_upto = Column(DateTime(timezone=True), nullable=False,
                          default=lambda: datetime.now(timezone.utc) + timedelta(days=2))
     access = Column(Boolean, nullable=False, default= False)
-    total_time = Column(Integer, nullable=False)
+    remaining_time = Column(Integer, nullable=False)

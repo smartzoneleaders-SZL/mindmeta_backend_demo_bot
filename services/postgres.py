@@ -164,7 +164,7 @@ def create_new_demo_access(email, name, phone_number):
         new_user = DemoAccess(
         name=name,
         email=email,
-        phone_number=phone_number, total_time = 0)
+        phone_number=phone_number, remaining_time = 1800)
         db.add(new_user)
         db.commit()
         return True
@@ -176,7 +176,6 @@ def validate_user(user_email: str):
     try:
         db = next(get_db())
         user = db.query(DemoAccess).filter(DemoAccess.email == user_email).first()
-        print("USer is: ",user)
         if user is None:
             raise HTTPException(status_code=404, detail="User not found, please register first")
         if user is not None:
@@ -242,8 +241,7 @@ def update_time_of_call(db,email: str, time: int):
         if user is None:
             raise HTTPException(status_code=404, detail="User not found (which is impossible)")
         if user.access:
-            updated_time = user.total_time + time
-            user.total_time = updated_time  
+            user.remaining_time = time
             db.commit()  
             db.refresh(user)
             return True
@@ -259,17 +257,21 @@ def update_time_of_call(db,email: str, time: int):
 def is_user_eligible_for_call(db, email: str):
     try:
         user = db.query(DemoAccess).filter(DemoAccess.email == email).first()
+        
         if user is None:
-            raise HTTPException(status_code=404, detail="user not found")
+            raise HTTPException(status_code=404, detail="User not found")
+
         if user.access:
-            if user.total_time < 1800:
-                return True, user.total_time
+            if user.remaining_time >= 1:
+                return True, user.remaining_time  
             else:
-                return False, 1800
+                return False, 0
         else:
             raise HTTPException(status_code=400, detail="User doesn't have access")
+
     except HTTPException as hp:
-        raise hp
+        raise hp  #
     except Exception as e:
-        print("Error in eligibility is: ",str(e))
-        raise HTTPException(status_code=500, detail="An Error has occured while checking eligibility")
+        print("Error in eligibility is:", str(e))
+        raise HTTPException(status_code=500, detail="An error occurred while checking eligibility")
+
