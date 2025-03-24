@@ -272,6 +272,16 @@ def is_user_eligible_for_call(db, email: str):
     except HTTPException as hp:
         raise hp  #
     except Exception as e:
-        print("Error in eligibility is:", str(e))
-        raise HTTPException(status_code=500, detail="An error occurred while checking eligibility")
+        print("Error in eligibility is: ",str(e))
+        raise HTTPException(status_code=500, detail="An Error has occured while checking eligibility")
 
+def delete_user_from_db(email: str):
+    try:
+        db = next(get_db())
+        user = db.query(DemoAccess).filter(DemoAccess.email == email).first()
+        db.delete(user)
+        db.commit()
+        return True
+    except Exception as e:
+        print("Error in deleting user from db: ",str(e))
+        raise HTTPException(status_code=500, detail="An Error has occured while deleting user from db")
