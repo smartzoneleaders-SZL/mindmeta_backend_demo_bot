@@ -22,7 +22,7 @@ import uuid
 import asyncio
 
 # For routers
-from routes import auth, allow_access, call_bot
+from routes import analytics, auth, allow_access, call_bot
 
 
 import os
@@ -219,9 +219,10 @@ async def websocket_endpoint(websocket: WebSocket):
 app.include_router(auth.router, prefix="/api/auth", tags=["AUTH"])
 app.include_router(allow_access.router, prefix="/api/allow-access", tags=["Allow Access"])
 app.include_router(call_bot.router, prefix="/api/call_bot", tags=["Call_bot"])
+app.include_router(analytics.router, prefix="/api/analytics", tags=["Analytics"])
 
 
 
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)

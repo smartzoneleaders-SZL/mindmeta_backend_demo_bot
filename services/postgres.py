@@ -1,5 +1,6 @@
 from fastapi import HTTPException
 # Postgres Models
+from model.demo_history import DemoHistory
 from model.patient import Patient
 from model.summary import Summary
 from model.life_history import LifeHistory
@@ -285,3 +286,28 @@ def delete_user_from_db(email: str):
     except Exception as e:
         print("Error in deleting user from db: ",str(e))
         raise HTTPException(status_code=500, detail="An Error has occured while deleting user from db")
+
+def add_demo_history(email: str):
+    """To add email to the demo history table"""
+    try:
+        db = next(get_db())
+        new_history = DemoHistory(email=email)
+        db.add(new_history)
+        db.commit()
+        return True
+    except Exception as e:
+        print("Error in adding demo history: ",str(e))
+        raise HTTPException(status_code=500, detail="An Error has occured while adding demo history")
+
+# Service to give access to user
+def give_access_to_user_by_admin(email: str):
+    try:
+        db = next(get_db())
+        user = db.query(DemoAccess).filter(DemoAccess.email == email).first()
+        user.access = True
+        db.commit()
+        db.refresh(user)
+        return True
+    except Exception as e:
+        print("Error in giving access to user by admin: ",str(e))
+        raise HTTPException(status_code=500, detail="An Error has occured while giving access to user by admin")

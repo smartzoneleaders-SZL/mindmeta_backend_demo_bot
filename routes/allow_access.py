@@ -1,4 +1,4 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from fastapi.responses import JSONResponse
 
 # for decoding 
@@ -8,6 +8,10 @@ from services.custom_link import decode_token
 from services.postgres import grant_access_by_email
 
 # For sendinf confirmation email to the carehome
+from services.send_email import send_email_alert
+
+from services.postgres import give_access_to_user_by_admin
+
 from services.send_email import send_email_alert
 
 router = APIRouter()
@@ -35,3 +39,25 @@ def allow_demo_access(encoded_data: str):
     except Exception as e:
         print("Error: ",str(e))
         return JSONResponse(content={"details": "Error occured"}, status_code=500)
+    
+
+@router.post("/give-access-to-user")
+def give_access_to_user(email: str):
+    """
+    Endpoint to give access to user
+    """
+    try:
+        give_access_to_user_by_admin(email)
+        # Send email to user to inform that they have access to the bot
+        subject = "Your Request for demo bot has been granted"
+        body = "Hi please go back to the login"
+        did_send = send_email_alert(email, subject, body)
+        if did_send:
+            return JSONResponse(content={"status": True, "detail": "Access email sent to user"}, status_code=200)
+        else:
+            return JSONResponse(content={"status": False, "detail": "Couldn't send email"}, status_code=400)
+    except HTTPException as http_exc:
+        return JSONResponse(content={"status": False, "detail": http_exc.detail}, status_code=http_exc.status_code)
+    except Exception as e:
+        print(f"Error in give_access_to_user: {str(e)}")
+        return JSONResponse(content={"status": False, "detail": "An unexpected error occurred"}, status_code=500)
