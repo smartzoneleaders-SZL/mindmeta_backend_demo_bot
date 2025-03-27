@@ -8,5 +8,7 @@ class DemoHistory(Base):
     __tablename__ = "demo_history"
     id = Column(Integer, primary_key=True)
     email = Column(String, nullable=False)
+    name= Column(String, nullable= False)
+    phone_number = Column(String, nullable=False)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 

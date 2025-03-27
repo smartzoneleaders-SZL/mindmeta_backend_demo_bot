@@ -1,4 +1,5 @@
 from fastapi import HTTPException
+from sqlalchemy import func
 
 # Postgres Models
 from model.demo_access import DemoAccess
@@ -55,12 +56,24 @@ def all_users_with_time_analytics(db: Session):
 def never_used_percentage(db: Session):
     """
     Fetches the percentage of users that have never used the bot (remaining_time is 1800).
+    Also returns a list of those users with their name, email, and phone number.
     
     Args:
         db (Session): SQLAlchemy database session provided by the route.
     
     Returns:
-        float: The percentage of users that have never used the bot.
+        dict: Dictionary containing percentage and list of users who never used the bot:
+              {
+                "percentage": 75.5,
+                "users": [
+                  {
+                    "name": "User Name",
+                    "email": "user@example.com",
+                    "phone_number": "0xxxxxx0"
+                  },
+                  ...
+                ]
+              }
     
     Raises:
         HTTPException: If there's an error querying the database.
@@ -68,16 +81,29 @@ def never_used_percentage(db: Session):
     try:
         # Query all users from the demo_user table (which are actived by admin)
         total_users = db.query(DemoAccess).filter(DemoAccess.access == True).count()
-        users_never_used = db.query(DemoAccess).filter(DemoAccess.access == True).where(DemoAccess.remaining_time == 1800).count()
+        
+        # Get users who never used the bot
+        users_never_used_query = db.query(DemoAccess).filter(DemoAccess.access == True).filter(DemoAccess.remaining_time == 1800).all()
+        users_never_used_count = len(users_never_used_query)
         
         # Prevent division by zero
         if total_users == 0:
-            return 0.0
+            return {"percentage": 0.0, "users": []}
         
         # Calculate the percentage
-        percentage = (users_never_used / total_users) * 100
+        percentage = (users_never_used_count / total_users) * 100
         
-        return percentage
+        # Format user data
+        users_list = [
+            {
+                "name": user.name,
+                "email": user.email,
+                "phone_number": user.phone_number
+            }
+            for user in users_never_used_query
+        ]
+        
+        return {"percentage": percentage, "users": users_list}
     
     except Exception as e:
         print(f"Error in never_used_percentage: {str(e)}")
@@ -148,6 +174,10 @@ def percentage_of_not_accessed_by_admin_users(db: Session):
 def percentage_of_users_came_back_after_30_minutes_usage(db: Session):
     """
     Fetches the percentage of users that have registered back after their 30 minutes usage.
+    Also returns a list of those users with their name, email, and phone number.
+    
+    Returns:
+        Dictionary with percentage and users data.
     """
     try:
         # users who have email in both demo_history and demo_access / total users in demo_access table
@@ -156,53 +186,77 @@ def percentage_of_users_came_back_after_30_minutes_usage(db: Session):
         # Create a proper subquery that selects just the email column
         access_emails = db.query(DemoAccess.email).subquery()
         
-        # Count DISTINCT users in DemoHistory whose emails are in the access_emails subquery
-        users_came_back = db.query(DemoHistory.email).distinct().filter(
-            DemoHistory.email.in_(access_emails)
-        ).count()
+        # Get users in DemoHistory whose emails are in the access_emails subquery
+        users_came_back_emails = db.query(DemoHistory.email).filter(DemoHistory.email.in_(access_emails)).distinct().all()
+        users_came_back_count = len(users_came_back_emails)
+        
+        # Get the full user details from DemoAccess for these emails
+        emails_list = [user.email for user in users_came_back_emails]
+        user_details = db.query(DemoAccess).filter(DemoAccess.email.in_(emails_list)).all()
         
         # prevent division by zero
         if total_users == 0:
-            return 0.0
+            return {"percentage": 0.0, "users": []}
 
-        percentage = (users_came_back / total_users) * 100
-        return percentage
+        percentage = (users_came_back_count / total_users) * 100
+        
+        # Format user data
+        users_list = [
+            {
+                "name": user.name,
+                "email": user.email,
+                "phone_number": user.phone_number
+            } 
+            for user in user_details
+        ]
+        
+        return {"percentage": percentage, "users": users_list}
     except Exception as e:
         print(f"Error in percentage_of_users_came_back_after_30_minutes_usage: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
-# percentage of people not registered back after their 30 minutes usage
 def people_never_registered_back_after_first_usage(db: Session):
     """
     Fetches the percentage of users who used the bot exactly once and never registered back.
+    Also returns a list of those users with their email (since name and phone are not available in DemoHistory).
     
-    Compares:
-    - Users who appear exactly once in DemoHistory and are not in DemoAccess (used once, never came back)
-    - Total unique users in DemoHistory (all users who ever used the bot)
+    Returns:
+        Dictionary with percentage and users data.
     """
     try:
-        # Import sqlalchemy func
-        from sqlalchemy import func
-        
         # Count total unique users in DemoHistory
         total_unique_users = db.query(DemoHistory.email).distinct().count()
         
         # Get emails that appear exactly once in DemoHistory
-        emails_used_once = db.query(DemoHistory.email).group_by(DemoHistory.email).having(func.count(DemoHistory.email) == 1).subquery()
+        emails_used_once = (
+            db.query(DemoHistory.email)
+            .group_by(DemoHistory.email)
+            .having(func.count(DemoHistory.email) == 1)
+            .subquery()
+        )
         
-        # Count emails that appear once in history and are not in the access table
-        emails_used_once_not_registered = db.query(emails_used_once).filter(
-            ~emails_used_once.c.email.in_(db.query(DemoAccess.email))
-        ).count()
+        # Fetch emails of users who used once and never registered
+        users_never_registered = (
+            db.query(DemoHistory)
+            .filter(DemoHistory.email.in_(emails_used_once))
+            .filter(~DemoHistory.email.in_(db.query(DemoAccess.email)))
+            .all()
+        )
+        print("USers are: ", users_never_registered)
+        emails_used_once_not_registered = len(users_never_registered)
         
-        # prevent division by zero
+        # Prevent division by zero
         if total_unique_users == 0:
-            return 0.0
-
+            return {"percentage": 0.0, "users": []}
+        
         # Calculate the percentage
         percentage = (emails_used_once_not_registered / total_unique_users) * 100
-
-        return percentage
+        
+        # Format user data
+        users_list = [{"email": user.email, "name": user.name, "phone_number": user.phone_number} for user in users_never_registered]
+        
+        return {"percentage": percentage, "users": users_list}
+    
     except Exception as e:
         print(f"Error in people_never_registered_back_after_first_usage: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")

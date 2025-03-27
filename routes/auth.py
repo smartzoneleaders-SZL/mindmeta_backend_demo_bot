@@ -15,7 +15,7 @@ from services.send_email import send_email_alert
 from services.postgres import add_demo_history, is_user_eligible_for_call, validate_user
 
 # check if user already exist in out database   and create a demo user
-from services.postgres import does_user_exist, create_new_demo_access, delete_user_from_db
+from services.postgres import does_user_exist, create_new_demo_access, delete_user_from_db, get_demo_user_by_email
 
 from fastapi import HTTPException
 import os
@@ -64,11 +64,13 @@ def login(request: LoginRequest, db: Session = Depends(get_db)):
     try:
         validated = validate_user(request.email)
         if(validated):
+            
             is_eligible, total_time = is_user_eligible_for_call(db, request.email)
             if is_eligible:
                 return JSONResponse(content={"access": True, "detail": ""}, status_code=200)
             else:
-                add_demo_history(request.email)
+                user = get_demo_user_by_email(request.email)
+                add_demo_history(request.email, user.name, user.phone_number)
                 delete_user_from_db(request.email)
                 return JSONResponse(content={"access": False, "detail": "Demo time (30 minutes) used. Please register again to continue."}, status_code=403)
     except HTTPException as http_exc:

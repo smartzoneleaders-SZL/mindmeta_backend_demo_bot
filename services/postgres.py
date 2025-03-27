@@ -106,6 +106,7 @@ def did_change_status_to_completed(patient_id:str)->str:
     INPUT:
         - patient_id
     OUTPUT:
+
         - True
         - If there is a problem an Error will be raised (raise)""" 
     try:
@@ -287,11 +288,11 @@ def delete_user_from_db(email: str):
         print("Error in deleting user from db: ",str(e))
         raise HTTPException(status_code=500, detail="An Error has occured while deleting user from db")
 
-def add_demo_history(email: str):
+def add_demo_history(email: str, name: str, phone_number: str):
     """To add email to the demo history table"""
     try:
         db = next(get_db())
-        new_history = DemoHistory(email=email)
+        new_history = DemoHistory(email=email, name =name , phone_number = phone_number)
         db.add(new_history)
         db.commit()
         return True
@@ -311,3 +312,20 @@ def give_access_to_user_by_admin(email: str):
     except Exception as e:
         print("Error in giving access to user by admin: ",str(e))
         raise HTTPException(status_code=500, detail="An Error has occured while giving access to user by admin")
+    
+
+
+def get_demo_user_by_email(email: str):
+    """To get all the details of the demo user using its email"""
+    try:
+        db= next(get_db())
+        user = db.query(DemoAccess).filter(DemoAccess.email == email).first()
+        if user is None:
+            raise HTTPException(status_code=404, detail="User not found")
+        return user
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="An Error occured in while getting user data from the db")
+
+

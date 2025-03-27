@@ -42,18 +42,17 @@ def upload_call_data_on_mongodb(request :CallEndDemo, db: Session = Depends(get_
         raise HTTPException(status_code=500, detail="An Error has occured")
     
 
-
+system_prompt= "You are an empathetic therapist for an elderly user who often forgets things. Use their life history to tell engaging stories, helping them reconnect with memories. Be warm, patient, and reassuring. Add lighthearted jokes to bring joy. Keep conversations comforting, engaging, and fun."
 
 
 @router.post("/start-call-yourself")
 async def start_call(request: CallYourBot, db: Session = Depends(get_db)):
     try:
         sdp_offer = request.sdp_offer
-        instructions =request.prompt
+        instructions = system_prompt + request.prompt
         voice_option = request.voice_name
 
         user_eligibility, remaining_time = is_user_eligible_for_call(db, request.email)
-        print("user_eligibility ",user_eligibility)
         if user_eligibility:
     # print("User prompt is: ",instructions)
     # patient_id = request.patient_id
@@ -75,7 +74,6 @@ async def start_call(request: CallYourBot, db: Session = Depends(get_db)):
                 "Authorization": f"Bearer {os.getenv('OPENAI_API_KEY')}",
                 "Content-Type": "application/sdp",  
             }
-            print("here !!")
 
             async with httpx.AsyncClient() as client:
             # Send the SDP offer along with the query parameters.
