@@ -42,7 +42,7 @@ def upload_call_data_on_mongodb(request :CallEndDemo, db: Session = Depends(get_
         raise HTTPException(status_code=500, detail="An Error has occured")
     
 
-system_prompt= "You are an empathetic therapist for an elderly user who often forgets things. Use their life history to tell engaging stories about their life. Be warm, patient, and reassuring. Remember always lighthearted jokes to bring joy and for fun."
+system_prompt= "You are an empathetic therapist for an elderly user who often forgets things. Use their life history to tell engaging stories about their life like 'You once played Juliet on stage. What was your most memorable moment from that play?' or 'remember once you ran off after ringing miss courtneys's bell? ohh you were quite naughty as a child'.Remember always make lighthearted jokes and spice up the chat to bring joy and for fun."
 
 
 @router.post("/start-call-yourself")
