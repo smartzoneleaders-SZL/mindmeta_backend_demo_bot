@@ -329,3 +329,12 @@ def get_demo_user_by_email(email: str):
         raise HTTPException(status_code=500, detail="An Error occured in while getting user data from the db")
 
 
+    
+def get_voice_from_db(patient_id):
+    """To get voice from the db"""
+    db = next(get_db())
+    user = db.query(Patient).filter(Patient.id == patient_id).first()
+    if user:
+        return user.hume_voice
+    else:
+        False

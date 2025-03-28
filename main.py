@@ -1,4 +1,5 @@
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import JSONResponse
 import httpx
 from urllib.parse import quote
 import uvicorn
@@ -15,6 +16,9 @@ from services.before_call_start import get_time_of_call
 
 # to check and inform about user suicidal behaviour
 from services.after_call_ends import check_chat_for_possible_word
+
+# To get bot voice
+from services.before_call_start import get_voice_of_bot
 
 # For websocket and deepgram
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
@@ -66,38 +70,48 @@ def health_check():
 
 @app.post("/start-call")
 async def start_call(request: SDPRequest):
-    sdp_offer = request.sdp_offer
+    try:
+        sdp_offer = request.sdp_offer
     # instructions =request.prompt
     # print("User prompt is: ",instructions)
-    patient_id = request.patient_id
-    if not OPENAI_API_KEY:
-        raise HTTPException(status_code=500, detail="Missing OpenAI API key")
-    print("Patient_id is: ",patient_id)
-    time_of_call = get_time_of_call(patient_id)
-    instructions = prepare_prompt(patient_id)
+        patient_id = request.patient_id
+        if not OPENAI_API_KEY:
+            raise HTTPException(status_code=500, detail="Missing OpenAI API key")
+        print("Patient_id is: ",patient_id)
+        time_of_call = get_time_of_call(patient_id)
+        instructions = prepare_prompt(patient_id)
+        voice_option = get_voice_of_bot(patient_id)
+
     # Build the URL with model and instructions passed as query parameters.
     # Use urllib.parse.quote to ensure proper URL-encoding of the instructions.
-    query_params = f"?model={MODEL}&instructions={quote(instructions)}"
-    url = f"{OPENAI_BASE_URL}{query_params}"
-
-    headers = {
-        "Authorization": f"Bearer {OPENAI_API_KEY}",
-        "Content-Type": "application/sdp",  
-    }
-
-    async with httpx.AsyncClient() as client:
-        # Send the SDP offer along with the query parameters.
-        response = await client.post(url, headers=headers, data=sdp_offer)
-        # print("Print repponse is: ",response.text)
-        # print("Print response status: ",response.status_code)
-        if response.status_code != 200 or response.status_code != 201:
-            print("Entered here")
-            raise HTTPException(
-                status_code=response.status_code,
-                detail={"sdp_answer": response.text, "time_in_seconds": time_of_call}
+        query_params = (
+                f"?model={os.getenv('MODEL')}"
+                f"&instructions={quote(instructions)}"
+                f"&voice={quote(voice_option)}"
+                f"&cache=true"         # Enable caching
+                # f"&cache_level=1"    # Optionally set cache level (if supported)
             )
-    
-    return {"sdp_answer": response.text, "time_in_seconds": time_of_call}
+        base_url = os.getenv('OPENAI_BASE_URL')
+        url = f"{base_url}{query_params}"
+
+        headers = {
+                "Authorization": f"Bearer {os.getenv('OPENAI_API_KEY')}",
+                "Content-Type": "application/sdp",}
+
+        async with httpx.AsyncClient() as client:
+            # Send the SDP offer along with the query parameters.
+            response = await client.post(url, headers=headers, data=sdp_offer)
+            if response.status_code == 200 or response.status_code == 201:
+                print("sdp data is: ",response.text)
+                return JSONResponse(
+                        status_code=response.status_code,
+                        content={"sdp_answer": response.text}
+                    )
+            else:
+                return JSONResponse(status_code=500, content={"detail":"An Error occured"})
+    except Exception as e:
+        print("Error as: ", str(e))
+        raise
 
 # For generating uuid 
 from utils.utils import generate_uuid
