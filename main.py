@@ -22,7 +22,7 @@ import uuid
 import asyncio
 
 # For routers
-from routes import analytics, auth, allow_access, call_bot
+from routes import analytics, auth, allow_access, call_bot, cold_call
 
 
 import os
@@ -220,6 +220,7 @@ app.include_router(auth.router, prefix="/api/auth", tags=["AUTH"])
 app.include_router(allow_access.router, prefix="/api/allow-access", tags=["Allow Access"])
 app.include_router(call_bot.router, prefix="/api/call_bot", tags=["Call_bot"])
 app.include_router(analytics.router, prefix="/api/analytics", tags=["Analytics"])
+app.include_router(cold_call.router, prefix="/api/cold-call", tags=["Cold Call Script"])
 
 
 
