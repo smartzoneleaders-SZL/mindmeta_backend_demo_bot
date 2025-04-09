@@ -72,13 +72,10 @@ def health_check():
 async def start_call(request: SDPRequest):
     try:
         sdp_offer = request.sdp_offer
-    # instructions =request.prompt
-    # print("User prompt is: ",instructions)
         patient_id = request.patient_id
         if not OPENAI_API_KEY:
             raise HTTPException(status_code=500, detail="Missing OpenAI API key")
-        print("Patient_id is: ",patient_id)
-        time_of_call = get_time_of_call(patient_id)
+        time_of_call = get_time_of_call(request.schedule_id)
         instructions = prepare_prompt(patient_id)
         voice_option = get_voice_of_bot(patient_id)
 
@@ -93,7 +90,6 @@ async def start_call(request: SDPRequest):
             )
         base_url = os.getenv('OPENAI_BASE_URL')
         url = f"{base_url}{query_params}"
-
         headers = {
                 "Authorization": f"Bearer {os.getenv('OPENAI_API_KEY')}",
                 "Content-Type": "application/sdp",}
@@ -105,7 +101,7 @@ async def start_call(request: SDPRequest):
                 print("sdp data is: ",response.text)
                 return JSONResponse(
                         status_code=response.status_code,
-                        content={"sdp_answer": response.text}
+                        content={"sdp_answer": response.text, "time": time_of_call}
                     )
             else:
                 return JSONResponse(status_code=500, content={"detail":"An Error occured"})
@@ -208,7 +204,7 @@ async def websocket_endpoint(websocket: WebSocket):
     except Exception as e:
         print(f"WebSocket error: {e}")
     finally:
-        dg_connection.finish()
+        # dg_connection.finish()
         try:
             await websocket.close()
         except RuntimeError:

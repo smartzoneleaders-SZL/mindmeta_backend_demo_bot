@@ -7,10 +7,14 @@ def prepare_prompt(patient_id):
     The data we get, we will prepare starting prompt with that."""
     try:
         life_history = get_patient_life_history(patient_id)
+        print("Life history is: ", life_history)
         medical_summary = get_patient_medical_summary_from_patient_id(patient_id)
+        print("Medical history is: ",medical_summary)
         title, description= get_current_call_title_description(patient_id)
-        if medical_summary is False:
-            return False
+        print("Title is: ", title, " description is: ", description)
+        if medical_summary is None:
+            return " "
+        
         instruction = f"""Your name is Elys, you are going to talk to a patient who is in a carehome:
       1. All responses must be exclusively in English. Regardless of the language used in the input, your output must not contain any words, phrases, or characters from any other language.
       2. User personal details and medical details are: {medical_summary}

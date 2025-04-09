@@ -51,9 +51,7 @@ def get_patient_medical_summary_from_patient_id(patient_id :str) ->str:
     try:
         db =next(get_db()) 
         patient_medical_history_summary = db.query(Summary).filter(Summary.patient_id == patient_id).first()
-        # print("Patient medical history summary is: ",patient_medical_history_summary.content)
-        if(patient_medical_history_summary is None):
-            return False
+        print("Patient medical history summary is: ",patient_medical_history_summary.content)
         return patient_medical_history_summary.content if patient_medical_history_summary else None
     except Exception as e:
         print("Error in get_patient_summary_from_patient_id function inside postgres in services -> ",str(e))
@@ -92,7 +90,7 @@ def get_current_call_title_description(patient_id: str) ->str:
         what_to_talk = db.query(ScheduledCall).filter(ScheduledCall.patient_id == patient_id,ScheduledCall.status == 'scheduled').first()
 
         if what_to_talk is None:
-            return False
+            return " ", " "
         # print("What to talk about in the call: ",what_to_talk.title, " and its description is: ",what_to_talk.description)
         return what_to_talk.title, what_to_talk.description
     except Exception as e:
@@ -125,20 +123,20 @@ def did_change_status_to_completed(patient_id:str)->str:
         raise
 
 
-def get_time_from_schedule_call_using_patient_id(patient_id):
+def get_time_from_schedule_call_using_patient_id(schedule_id):
     """Get time of scheduled call in seconds"""
     try:
         db= next(get_db())
-        time = (db.query(ScheduledCall.call_duration).filter(ScheduledCall.patient_id == patient_id, ScheduledCall.status == "scheduled").first())
-
+        time = (db.query(ScheduledCall.call_duration).filter(ScheduledCall.id == schedule_id).first())
+        print("Time is: ", time)
         call_duration = time[0] if time else False
 
-        print(call_duration)
+        print("call duration is: ",call_duration)
         if call_duration:
             return call_duration
         else:
             print("Call duration is none that's what the db sent")
-            raise
+            raise HTTPException(status_code=500, detail="Call duration is none")
     
     except Exception as e:
         print("Error on get_time_from_schedule_call_using_patient_id in postgres.py -> ",str(e))

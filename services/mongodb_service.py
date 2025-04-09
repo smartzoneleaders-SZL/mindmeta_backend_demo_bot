@@ -99,5 +99,6 @@ async def upload_on_mongodb(patient_id: str, call_id: str, data_to_upload: dict)
         logger.info("Document updated for patient_id: %s with call_id: %s", patient_id, call_id)
         return result.modified_count
     except Exception as e:
+        print("Error in mongodb service is: ", str(e))
         logger.error("Error in upload_on_mongodb: %s", str(e))
         raise
