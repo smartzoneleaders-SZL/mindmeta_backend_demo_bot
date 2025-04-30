@@ -30,7 +30,8 @@ router = APIRouter()
 
 
 @router.post("/call-with-bot-end")
-def upload_call_data_on_mongodb(request :CallEndDemo, db: Session = Depends(get_db)):
+def update_time(request :CallEndDemo, db: Session = Depends(get_db)):
+    """Update the remaining time of the user to use the bot, as we ony allow 30 mins per user """
     try:
         did_change = update_time_of_call(db,request.email,request.time)
         if did_change:
@@ -38,7 +39,6 @@ def upload_call_data_on_mongodb(request :CallEndDemo, db: Session = Depends(get_
     except HTTPException as http_exc:
         return JSONResponse(content={"detail": http_exc.detail}, status_code=http_exc.status_code)
     except Exception as e:
-        print("Error in call_with_bot_end in main.py -> ",str(e))
         raise HTTPException(status_code=500, detail="An Error has occured")
     
 
@@ -47,6 +47,7 @@ system_prompt= "You are an empathetic therapist for an elderly user who often fo
 
 @router.post("/start-call-yourself")
 async def start_call(request: CallYourBot, db: Session = Depends(get_db)):
+    """Generate the the connection details for user so he call use those connection details to talk to openai"""
     try:
         sdp_offer = request.sdp_offer
         instructions = system_prompt + request.prompt
@@ -54,12 +55,9 @@ async def start_call(request: CallYourBot, db: Session = Depends(get_db)):
 
         user_eligibility, remaining_time = is_user_eligible_for_call(db, request.email)
         if user_eligibility:
-    # print("User prompt is: ",instructions)
-    # patient_id = request.patient_id
             if not os.getenv('OPENAI_API_KEY'):
                 raise HTTPException(status_code=500, detail="Missing OpenAI API key")
-    # Build the URL with model and instructions passed as query parameters.
-    # Use urllib.parse.quote to ensure proper URL-encoding of the instructions.
+
             query_params = (
                 f"?model={os.getenv('MODEL')}"
                 f"&instructions={quote(instructions)}"
