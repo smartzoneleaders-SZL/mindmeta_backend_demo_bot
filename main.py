@@ -85,8 +85,8 @@ async def start_call(request: SDPRequest):
                 f"?model={os.getenv('MODEL')}"
                 f"&instructions={quote(instructions)}"
                 f"&voice={quote(voice_option)}"
-                f"&cache=true"         # Enable caching
-                # f"&cache_level=1"    # Optionally set cache level (if supported)
+                f"&cache=true"         # Enabling caching
+                # f"&cache_level=1"    # Optional for chaching
             )
         base_url = os.getenv('OPENAI_BASE_URL')
         url = f"{base_url}{query_params}"
@@ -120,9 +120,7 @@ from services.after_call_ends import upload_chat_hisory, change_call_status_to_c
 def upload_call_data_on_mongodb(request :RequestData):
     try:
         patient_id= request.patient_id
-        # call_id = generate_uuid()
-        # messages = "Hello my name is Sarab. my childern don't come here to visit me my wife died i should join her"
-        # is_done = check_chat_for_possible_word(messages,patient_id)
+       
         # Now because the call has ended, we need to change the status from 'schedule' to 'completed'
         did_change = change_call_status_to_completed(patient_id)
         if did_change:
@@ -146,6 +144,7 @@ from deepgram import (
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
+    """USing this we will be collecting the user chat datat to monitor sentiments during the call"""
     await websocket.accept()
     try:
         patient_id = await asyncio.wait_for(websocket.receive_text(), timeout=2.0)
