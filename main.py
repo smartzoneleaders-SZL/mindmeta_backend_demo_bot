@@ -1,49 +1,48 @@
-from fastapi import FastAPI, HTTPException
-from fastapi.responses import JSONResponse
-import httpx
-from urllib.parse import quote
-import uvicorn
-from fastapi.middleware.cors import CORSMiddleware
-
-# For schemas of endpoints
-from schema.call_bot import SDPRequest, RequestData, CallYourBot
-
-# for the prompt that we will give the model
-from services.preparing_prompt import prepare_prompt
-
-# To get time of scheduled call
-from services.before_call_start import get_time_of_call
-
-# to check and inform about user suicidal behaviour
-from services.after_call_ends import check_chat_for_possible_word
-
-# To get bot voice
-from services.before_call_start import get_voice_of_bot
-
-# For websocket and deepgram
+import requests  
+import base64
+import json
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
-import uuid
+from deepgram import DeepgramClient, LiveTranscriptionEvents, LiveOptions
 import asyncio
-
-# For routers
-from routes import analytics, auth, allow_access, call_bot, cold_call
-
-
 import os
 from dotenv import load_dotenv
+from services.Langchain_service import chat_with_model
+import logging
+# For extracting history
+from services.after_call_ends import get_chat_hisory
 
-# For loading Pete's dummy data 
-# from db.dummy_data import instructions
+# For running main.py 
+import uvicorn
+
+# import uid for new chats
+import uuid 
+
+# from datetime
+from datetime import datetime
+
+# For eleven labs
+from services.eleven_lab_services import ElevenLabsService
+
+# From openai
+# from services.openai_service import system_prompt, client
+
+# For direct groq
+# from services.direct_langchain import client
+# from services.openai_service import main_prompt
+
+# For middleware
+from fastapi.middleware.cors import CORSMiddleware
+
+
+
+
+
+
 
 load_dotenv()
 
 app = FastAPI()
-
-
-# origins = [
-#     "http://localhost:5173",  
-#     "http://127.0.0.1:5173", 
-# ]
+# Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -52,187 +51,168 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Initialize Deepgram client
+api_key = os.getenv("DEEPGRAM_API_KEY")
+if not api_key:
+    raise ValueError("Deepgram API Key is missing.")
+deepgram_client = DeepgramClient(api_key)
+
+def invoke_model(input, chat_id):
+    input_data = {"messages": [{"role": "user", "content": input}]}
+    config = {"configurable": {"thread_id": chat_id}}
+    response = chat_with_model.invoke(input_data, config=config)
+    return response["messages"][-1].content
 
 
 
-OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
-OPENAI_BASE_URL = "https://api.openai.com/v1/realtime"
-MODEL = "gpt-4o-mini-realtime-preview-2024-12-17"
 
 
-@app.get("/health-check")
-def health_check():
+def text_to_speech(text: str, message_queue) -> bytes:
+    """Convert text to speech using ElevenLabs API with latency optimization"""
     try:
-        return {"status": "Good"}
+        print("Sending llm response to TTS: ", text)
+        audio_data = ElevenLabsService.text_to_speech(
+            text=text, 
+            voice_id="21m00Tcm4TlvDq8ikWAM",  # Just for demo: Rachel voice
+            optimize_streaming_latency=4
+        )
+
+        # Encode audio bytes to base64 string
+        audio_base64 = base64.b64encode(audio_data).decode('utf-8')
+
+        # Send audio as base64 string in JSON
+        message = json.dumps({"audio": audio_base64, "complete": True})
+        message_queue.put_nowait(message)
+        
+        return True
+        
     except Exception as e:
-        return {"status": "Bad"}
+        return text_to_speech("Oh sorry can you repeat?")
 
+# this is for deepgram tts (incase we switch but right now its not being used)
+# def async_tts_service(text, message_queue, audio):
+#     logging.info("Sending llm to TTS: ",text)
+#     voice = 'aura-athena-en'
+#     if audio == 'm':
+#         voice = 'aura-helios-en'
+#     try: 
+#         DEEPGRAM_URL = f"https://api.deepgram.com/v1/speak?model={voice}"
+#         DEEPGRAM_API_KEY = os.getenv("DEEPGRAM_API_KEY")  # Use the correct API key
 
-@app.post("/start-call")
-async def start_call(request: SDPRequest):
-    try:
-        sdp_offer = request.sdp_offer
-        patient_id = request.patient_id
-        if not OPENAI_API_KEY:
-            raise HTTPException(status_code=500, detail="Missing OpenAI API key")
-        time_of_call = get_time_of_call(request.schedule_id)
-        instructions = prepare_prompt(patient_id)
-        voice_option = get_voice_of_bot(patient_id)
+#         payload = {
+#             "text": text  # Use the text passed to the function
+#         }
 
-    # Build the URL with model and instructions passed as query parameters.
-    # Use urllib.parse.quote to ensure proper URL-encoding of the instructions.
-        query_params = (
-                f"?model={os.getenv('MODEL')}"
-                f"&instructions={quote(instructions)}"
-                f"&voice={quote(voice_option)}"
-                f"&cache=true"         # Enabling caching
-                # f"&cache_level=1"    # Optional for chaching
-            )
-        base_url = os.getenv('OPENAI_BASE_URL')
-        url = f"{base_url}{query_params}"
-        headers = {
-                "Authorization": f"Bearer {os.getenv('OPENAI_API_KEY')}",
-                "Content-Type": "application/sdp",}
+#         headers = {
+#             "Authorization": f"Token {DEEPGRAM_API_KEY}",
+#             "Content-Type": "application/json"
+#         }
 
-        async with httpx.AsyncClient() as client:
-            # Send the SDP offer along with the query parameters.
-            response = await client.post(url, headers=headers, data=sdp_offer)
-            if response.status_code == 200 or response.status_code == 201:
-                print("sdp data is: ",response.text)
-                return JSONResponse(
-                        status_code=response.status_code,
-                        content={"sdp_answer": response.text, "time": time_of_call}
-                    )
-            else:
-                return JSONResponse(status_code=500, content={"detail":"An Error occured"})
-    except Exception as e:
-        print("Error as: ", str(e))
-        raise
+#         response = requests.post(DEEPGRAM_URL, headers=headers, json=payload, stream=True)
 
-# For generating uuid 
-from utils.utils import generate_uuid
+#         # Check if the response is valid
+#         if not response.ok:
+#             #print("Failed to get audio from TTS service")
+#             return
 
-# for uploading chat
-# for changing the status
-from services.after_call_ends import upload_chat_hisory, change_call_status_to_completed
+#         # Collect all chunks
+#         audio_chunks = []
+#         for chunk in response.iter_content(chunk_size=1024):
+#             if chunk:
+#                 audio_chunks.append(chunk)
 
-@app.post("/call-with-bot-end")
-def upload_call_data_on_mongodb(request :RequestData):
-    try:
-        patient_id= request.patient_id
-       
-        # Now because the call has ended, we need to change the status from 'schedule' to 'completed'
-        did_change = change_call_status_to_completed(patient_id)
-        if did_change:
-            return {"sucess": True, "details": " "}
-        # did_upload = upload_chat_hisory(patient_id , call_id, messages)
-        # if did_upload and did_change:
-        #     return {"sucess":True, "details": "chat history upload and schedule call status changed"}
-        # else:
-        #     return {"sucess": False, "details": " "}
-    except Exception as e:
-        print("Error in call_with_bot_end in main.py -> ",str(e))
-        raise
+#         # Combine all chunks into a single file
+#         combined_audio = b"".join(audio_chunks)
+#         audio_base64 = base64.b64encode(combined_audio).decode("utf-8")
 
+#         # Send the combined audio to the frontend
+#         message = json.dumps({"audio": audio_base64, "complete": True})
+#         logging.info("Sending voice to frontend")
+#         message_queue.put_nowait(message)
+#     except Exception as e:
+#         print(f"TTS error: {e}")
 
-from deepgram import (
-    DeepgramClient,
-    LiveTranscriptionEvents,
-    LiveOptions,
-)
+@app.get("/")
+def check_me():
+    return {"message":"Done"}
 
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
-    """USing this we will be collecting the user chat datat to monitor sentiments during the call"""
+    print("Entered")
+    dg_connection = None
     await websocket.accept()
     try:
-        patient_id = await asyncio.wait_for(websocket.receive_text(), timeout=2.0)
-        print(f"Received patient_id: {patient_id}")
-    except asyncio.TimeoutError:
-        await websocket.send_text("Error: Patient ID not received within 3 seconds")
-        await websocket.close()
-        return
+        send_task = None
+        new_chat_id = uuid.uuid1()
+        
+        dg_connection = deepgram_client.listen.websocket.v("1")
 
-    total_chat = ""
-    new_chat_id = uuid.uuid1()
-    deepgram_client: DeepgramClient = DeepgramClient(api_key=os.getenv('DEEPGRAM_API'))
-    dg_connection = deepgram_client.listen.websocket.v("1")
+        message_queue = asyncio.Queue()
 
-    def on_open(self, open, **kwargs):
-        print(f"Deepgram connection opened: {open}")
+        def on_message(self, result, **kwargs):
+            sentence = result.channel.alternatives[0].transcript
+            if result.speech_final and sentence.strip():
+                llm_response = invoke_model(sentence,new_chat_id)  
+                text_to_speech(llm_response, message_queue)
 
-    def on_message(self, result, **kwargs):
-        nonlocal total_chat
-        if result.is_final:
-            transcript = result.channel.alternatives[0].transcript.strip()
-            print(f"Final Transcription: {transcript}")
-            total_chat += transcript + " "
+                
 
-    def on_error(self, error, **kwargs):
-        print(f"Deepgram error: {error}")
 
-    def on_close(self, close, **kwargs):
-        print(f"Deepgram connection closed: {close}")
+        def on_error(self, error, **kwargs):
+            logging.error(f"Deepgram error: {error}")
 
-    dg_connection.on(LiveTranscriptionEvents.Open, on_open)
-    dg_connection.on(LiveTranscriptionEvents.Transcript, on_message)
-    dg_connection.on(LiveTranscriptionEvents.Error, on_error)
-    dg_connection.on(LiveTranscriptionEvents.Close, on_close)
+        def on_close(self, *args, **kwargs):  
+            logging.info("Deepgram connection closed")
 
-    options: LiveOptions = LiveOptions(
-        model="nova-3",
-        language="en-US",
-        smart_format=True,
-        interim_results=True,
-        utterance_end_ms="4000",
-        vad_events=True,
-        endpointing=300
-    )
+        dg_connection.on(LiveTranscriptionEvents.Transcript, on_message)
+        dg_connection.on(LiveTranscriptionEvents.Error, on_error)
+        dg_connection.on(LiveTranscriptionEvents.Close, on_close)
 
-    if not dg_connection.start(options):
-        await websocket.close()
-        return
+        options = LiveOptions(
+            model="nova-3",
+            smart_format=True,
+            interim_results=True,
+            language="en",
+        )
 
-    try:
+        if dg_connection.start(options) is False:
+            print("Failed to start connection")
+            return
+    
+
+        async def send_messages():
+            while True:
+                message = await message_queue.get()
+                await websocket.send_text(message)
+
+        send_task = asyncio.create_task(send_messages())
+
         while True:
-            data = await websocket.receive_bytes()
-            dg_connection.send(data)
-    except WebSocketDisconnect:
-        await upload_chat_hisory(patient_id, new_chat_id, total_chat)
+            try:
+
+                data = await websocket.receive_bytes()
+
+                dg_connection.send(data)
+            except WebSocketDisconnect as e:
+                print("Error on websocket is: ",str(e))
+                
+                # printing all the history interaction 
+                get_chat_hisory(chat_with_model,new_chat_id)
+                break
+
     except Exception as e:
         print(f"WebSocket error: {e}")
     finally:
-        # dg_connection.finish()
-        try:
-            await websocket.close()
-        except RuntimeError:
-            print("WebSocket already closed.")
-
-# voice_option = "sage"
-
-
-# "alloy"
-# "ash"
-# "ballad"
-# "coral"
-# "echo"
-# "sage"
-# "shimmer"
-# "verse"
-
-
-
-
-
-app.include_router(auth.router, prefix="/api/auth", tags=["AUTH"])
-app.include_router(allow_access.router, prefix="/api/allow-access", tags=["Allow Access"])
-app.include_router(call_bot.router, prefix="/api/call_bot", tags=["Call_bot"])
-app.include_router(analytics.router, prefix="/api/analytics", tags=["Analytics"])
-app.include_router(cold_call.router, prefix="/api/cold-call", tags=["Cold Call Script"])
-
-
-
+        if dg_connection is not None:
+            dg_connection.finish()
+        if send_task is not None:
+            send_task.cancel()
+    try:
+        await websocket.close()
+    except RuntimeError:
+        print("WebSocket already closed.")
 
 if __name__ == "__main__":
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run(app, host="0.0.0.0", port=8000)
+
