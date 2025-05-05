@@ -70,7 +70,7 @@ def invoke_model(input, chat_id):
 def text_to_speech(text: str, message_queue) -> bytes:
     """Convert text to speech using ElevenLabs API with latency optimization"""
     try:
-        print("Sending llm response to TTS: ", text)
+        logging.info("Sending llm response to TTS: ", text)
         audio_data = ElevenLabsService.text_to_speech(
             text=text, 
             voice_id="gUbIduqGzBP438teh4ZA",  # Just for demo: Rachel voice
@@ -139,7 +139,7 @@ def check_me():
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
-    print("Entered")
+    logging.info("Entered")
     dg_connection = None
     await websocket.accept()
     try:
@@ -202,7 +202,7 @@ async def websocket_endpoint(websocket: WebSocket):
                 break
 
     except Exception as e:
-        print(f"WebSocket error: {e}")
+        logging.error(f"WebSocket error: {e}")
     finally:
         if dg_connection is not None:
             dg_connection.finish()
@@ -211,7 +211,7 @@ async def websocket_endpoint(websocket: WebSocket):
     try:
         await websocket.close()
     except RuntimeError:
-        print("WebSocket already closed.")
+        logging.error("WebSocket already closed.")
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=80)
