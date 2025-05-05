@@ -73,7 +73,7 @@ def text_to_speech(text: str, message_queue) -> bytes:
         print("Sending llm response to TTS: ", text)
         audio_data = ElevenLabsService.text_to_speech(
             text=text, 
-            voice_id="21m00Tcm4TlvDq8ikWAM",  # Just for demo: Rachel voice
+            voice_id="gUbIduqGzBP438teh4ZA",  # Just for demo: Rachel voice
             optimize_streaming_latency=4
         )
 
