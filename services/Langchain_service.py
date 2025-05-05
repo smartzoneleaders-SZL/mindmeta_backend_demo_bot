@@ -21,9 +21,9 @@ user_info ="Pete Hillman , a 78-year-old retired postmaster from Bristol, UK, wh
 
 
 
-if not os.environ.get("OPENAI_API_KEY"):
-  os.environ["OPENAI_API_KEY"] = os.getenv("OPENAI_API_KEY")
-#   os.environ["GROQ_API_KEY"] = os.getenv("GROQ_API_KEY")
+if not os.environ.get("GROQ_API_KEY"):
+#   os.environ["OPENAI_API_KEY"] = os.getenv("OPENAI_API_KEY")
+  os.environ["GROQ_API_KEY"] = os.getenv("GROQ_API_KEY")
 
 
 
@@ -66,7 +66,7 @@ from langchain.chat_models import init_chat_model
 
 # Initialize the chat model
 # model = init_chat_model("gpt-3.5-turbo-0125", model_provider="openai")
-model = init_chat_model("gemma2-9b-it", model_provider="groq")
+model = init_chat_model("llama-3.3-70b-versatile", model_provider="groq")
 
 # Define the function that calls the model
 def call_model(state: MessagesState):
@@ -92,6 +92,32 @@ workflow.add_edge("chat_prompt", "model")
 memory = MemorySaver()
 # Compile the workflow with the memory checkpointer
 chat_with_model = workflow.compile(checkpointer=memory)
+
+
+
+
+
+
+from langchain_core.messages import HumanMessage, SystemMessage
+from utils.utils import parse_boolean_from_response 
+
+def are_sentences_related(first, second):
+    messages = [
+    SystemMessage( "Decide whether the two provided fragments could naturally combine to form a single coherent sentence. "
+    "For example, 'my name' and 'is Jake' together form 'My name is Jake' — return 'True'. "
+    "If they do not combine into a grammatically correct sentence, return 'False'. "
+    "Only respond with 'True' or 'False'. No explanation."
+        ),
+    HumanMessage(f"first sentence: {first}, second sentence {second}"),]
+    
+    model_response =  model.invoke(messages)
+
+    parser = parse_boolean_from_response(model_response.content)
+    print("Response from parser is: ",parser)
+    return parser
+    
+
+
 
 
 

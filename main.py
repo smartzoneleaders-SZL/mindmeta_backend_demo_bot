@@ -3,10 +3,10 @@ import base64
 import json
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from deepgram import DeepgramClient, LiveTranscriptionEvents, LiveOptions
-import asyncio
+
 import os
 from dotenv import load_dotenv
-from services.Langchain_service import chat_with_model
+from services.Langchain_service import chat_with_model, are_sentences_related
 import logging
 # For extracting history
 from services.after_call_ends import get_chat_hisory
@@ -32,6 +32,14 @@ from services.eleven_lab_services import ElevenLabsService
 
 # For middleware
 from fastapi.middleware.cors import CORSMiddleware
+
+
+
+import asyncio
+from concurrent.futures import ThreadPoolExecutor, wait
+
+# Reuse a single executor for all on_message calls
+_executor = ThreadPoolExecutor()
 
 
 
@@ -67,6 +75,7 @@ def invoke_model(input, chat_id):
 
 
 
+
 def text_to_speech(text: str, message_queue) -> bytes:
     """Convert text to speech using ElevenLabs API with latency optimization"""
     try:
@@ -89,49 +98,6 @@ def text_to_speech(text: str, message_queue) -> bytes:
     except Exception as e:
         return text_to_speech("Oh sorry can you repeat?")
 
-# this is for deepgram tts (incase we switch but right now its not being used)
-# def async_tts_service(text, message_queue, audio):
-#     logging.info("Sending llm to TTS: ",text)
-#     voice = 'aura-athena-en'
-#     if audio == 'm':
-#         voice = 'aura-helios-en'
-#     try: 
-#         DEEPGRAM_URL = f"https://api.deepgram.com/v1/speak?model={voice}"
-#         DEEPGRAM_API_KEY = os.getenv("DEEPGRAM_API_KEY")  # Use the correct API key
-
-#         payload = {
-#             "text": text  # Use the text passed to the function
-#         }
-
-#         headers = {
-#             "Authorization": f"Token {DEEPGRAM_API_KEY}",
-#             "Content-Type": "application/json"
-#         }
-
-#         response = requests.post(DEEPGRAM_URL, headers=headers, json=payload, stream=True)
-
-#         # Check if the response is valid
-#         if not response.ok:
-#             #print("Failed to get audio from TTS service")
-#             return
-
-#         # Collect all chunks
-#         audio_chunks = []
-#         for chunk in response.iter_content(chunk_size=1024):
-#             if chunk:
-#                 audio_chunks.append(chunk)
-
-#         # Combine all chunks into a single file
-#         combined_audio = b"".join(audio_chunks)
-#         audio_base64 = base64.b64encode(combined_audio).decode("utf-8")
-
-#         # Send the combined audio to the frontend
-#         message = json.dumps({"audio": audio_base64, "complete": True})
-#         logging.info("Sending voice to frontend")
-#         message_queue.put_nowait(message)
-#     except Exception as e:
-#         print(f"TTS error: {e}")
-
 @app.get("/")
 def check_me():
     return {"message":"Done"}
@@ -145,17 +111,44 @@ async def websocket_endpoint(websocket: WebSocket):
     try:
         send_task = None
         new_chat_id = uuid.uuid1()
+        last_message = " "
         
         dg_connection = deepgram_client.listen.websocket.v("1")
 
         message_queue = asyncio.Queue()
 
         def on_message(self, result, **kwargs):
-            sentence = result.channel.alternatives[0].transcript
-            if result.speech_final and sentence.strip():
-                llm_response = invoke_model(sentence,new_chat_id)  
-                text_to_speech(llm_response, message_queue)
+            sentence = result.channel.alternatives[0].transcript.strip()
+            if not (result.speech_final and sentence):
+                return
 
+            nonlocal last_message
+            old_last = last_message
+
+            # Submit both tasks at once
+            future_llm     = _executor.submit(invoke_model, sentence, new_chat_id)
+            future_related = _executor.submit(are_sentences_related, old_last, sentence)
+
+            # Wait for both to complete
+            wait([future_llm, future_related])
+
+            # Pull results
+            llm_response = future_llm.result()
+            is_related   = future_related.result()
+
+            if is_related:
+                # If they're part of the same sentence
+                last_message = f"{old_last} {sentence}"
+                print("merged sentences and speaking.", last_message)
+                speak_merged = invoke_model(last_message, new_chat_id)
+                print("Response from llm is: ",speak_merged)
+                text_to_speech(speak_merged, message_queue)
+            else:
+                # Otherwise treat it as a standalone sentence & speak immediately
+                last_message = sentence
+                print("New sentence, speaking now. the sentence is: ", last_message)
+                print("Response from llm is: ",llm_response)
+                text_to_speech(llm_response, message_queue)
                 
 
 
