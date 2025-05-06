@@ -81,7 +81,7 @@ def invoke_model(input, chat_id):
 def text_to_speech(text: str, message_queue) -> bytes:
     """Convert text to speech using ElevenLabs API with latency optimization"""
     try:
-        logging.info("Sending llm response to TTS: ", text)
+        logging.info(f"Sending llm response to TTS: {text} ")
         audio_data = ElevenLabsService.text_to_speech(
             text=text, 
             voice_id="gUbIduqGzBP438teh4ZA",  # Just for demo: Rachel voice
