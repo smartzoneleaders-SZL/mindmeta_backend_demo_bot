@@ -44,6 +44,8 @@ _executor = ThreadPoolExecutor()
 
 
 
+# For azure logs
+logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
 
 
 
@@ -105,7 +107,7 @@ def check_me():
 
 
 async def send_interruption(websocket):
-    print("Intruption done")
+    logging.info("Intruption done")
     await websocket.send_text("intruption")
 
 
@@ -149,15 +151,15 @@ async def websocket_endpoint(websocket: WebSocket):
             if is_related:
                 # If they're part of the same sentence
                 last_message = f"{old_last} {sentence}"
-                print("merged sentences and speaking.", last_message)
+                logging.info(f"merged sentences and speaking. {last_message}")
                 speak_merged = invoke_model(last_message, new_chat_id)
-                print("Response from llm is: ",speak_merged)
+                logging.info(f"Response from llm is: {speak_merged} ")
                 text_to_speech(speak_merged, message_queue)
             else:
                 # Otherwise treat it as a standalone sentence & speak immediately
                 last_message = sentence
-                print("New sentence, speaking now. the sentence is: ", last_message)
-                print("Response from llm is: ",llm_response)
+                logging.info(f"New sentence, speaking now. the sentence is: {last_message} ")
+                logging.info(f"Response from llm is: {llm_response} ")
                 text_to_speech(llm_response, message_queue)
                 
 
