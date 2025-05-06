@@ -12,7 +12,7 @@ from langgraph.graph import START, MessagesState, StateGraph
 load_dotenv()
 
 
-user_info ="Pete Hillman , a 78-year-old retired postmaster from Bristol, UK, who is living with early-stage dementia in a care home "
+user_info ="Pete Hillman , a 78-year-old retired postmaster from Bristol, UK, who is living with early-stage dementia in a care home. Pete has two sons name 'jake' and 'jack' and a daughter name 'margurete' "
 
 
 
@@ -23,7 +23,7 @@ user_info ="Pete Hillman , a 78-year-old retired postmaster from Bristol, UK, wh
 if not os.environ.get("GROQ_API_KEY"):
 #   os.environ["OPENAI_API_KEY"] = os.getenv("OPENAI_API_KEY")
   os.environ["GROQ_API_KEY"] = os.getenv("GROQ_API_KEY")
-    # os.environ["ANTHROPIC_API_KEY"] = getpass.getpass("Enter API key for Anthropic: ")
+    # os.environ["ANTHROPIC_API_KEY"] = os.getenv("ANTHROPIC_API_KEY")
 
 
 
@@ -102,6 +102,12 @@ chat_with_model = workflow.compile(checkpointer=memory)
 
 from langchain_core.messages import HumanMessage, SystemMessage
 from utils.utils import parse_boolean_from_response 
+if not os.environ.get("ANTHROPIC_API_KEY"):
+#   os.environ["OPENAI_API_KEY"] = os.getenv("OPENAI_API_KEY")
+#   os.environ["GROQ_API_KEY"] = os.getenv("GROQ_API_KEY")
+    os.environ["ANTHROPIC_API_KEY"] = os.getenv("ANTHROPIC_API_KEY")
+
+model_anthropic = init_chat_model("claude-3-5-sonnet-latest", model_provider="anthropic")
 
 def are_sentences_related(first, second):
     messages = [
@@ -112,7 +118,7 @@ def are_sentences_related(first, second):
         ),
     HumanMessage(f"first sentence: {first}, second sentence {second}"),]
     
-    model_response =  model.invoke(messages)
+    model_response =  model_anthropic.invoke(messages)
 
     parser = parse_boolean_from_response(model_response.content)
     print("Response from parser is: ",parser)

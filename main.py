@@ -2,7 +2,7 @@ import requests
 import base64
 import json
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
-from deepgram import DeepgramClient, LiveTranscriptionEvents, LiveOptions
+from deepgram import DeepgramClient, LiveTranscriptionEvents, LiveOptions, DeepgramClientOptions
 
 import os
 from dotenv import load_dotenv
@@ -65,7 +65,11 @@ app.add_middleware(
 api_key = os.getenv("DEEPGRAM_API_KEY")
 if not api_key:
     raise ValueError("Deepgram API Key is missing.")
-deepgram_client = DeepgramClient(api_key)
+
+config = DeepgramClientOptions(
+            options={"keepalive": "true"}
+        )
+deepgram_client = DeepgramClient(api_key, config)
 
 def invoke_model(input, chat_id):
     input_data = {"messages": [{"role": "user", "content": input}]}
@@ -177,7 +181,6 @@ async def websocket_endpoint(websocket: WebSocket):
         options = LiveOptions(
             model="nova-3",
             smart_format=True,
-            interim_results=True,
             language="en",
         )
 
