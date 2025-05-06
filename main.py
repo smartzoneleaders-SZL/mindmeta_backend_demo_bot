@@ -66,10 +66,10 @@ api_key = os.getenv("DEEPGRAM_API_KEY")
 if not api_key:
     raise ValueError("Deepgram API Key is missing.")
 
-config = DeepgramClientOptions(
-            options={"keepalive": "true"}
-        )
-deepgram_client = DeepgramClient(api_key, config)
+# config = DeepgramClientOptions(
+#             options={"keepalive": "true"}
+#         )
+deepgram_client = DeepgramClient(api_key)
 
 def invoke_model(input, chat_id):
     input_data = {"messages": [{"role": "user", "content": input}]}
@@ -85,7 +85,6 @@ def invoke_model(input, chat_id):
 def text_to_speech(text: str, message_queue) -> bytes:
     """Convert text to speech using ElevenLabs API with latency optimization"""
     try:
-        logging.info(f"Sending llm response to TTS: {text} ")
         audio_data = ElevenLabsService.text_to_speech(
             text=text, 
             voice_id="gUbIduqGzBP438teh4ZA",  # Just for demo: Rachel voice
