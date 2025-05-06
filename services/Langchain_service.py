@@ -14,8 +14,7 @@ load_dotenv()
 
 user_info ="Pete Hillman , a 78-year-old retired postmaster from Bristol, UK, who is living with early-stage dementia in a care home "
 
-# # Set the API key
-# os.environ["GROQ_API_KEY"] = os.getenv("GROQ_API_KEY")
+
 
 # # Initialize the model
 
@@ -24,6 +23,7 @@ user_info ="Pete Hillman , a 78-year-old retired postmaster from Bristol, UK, wh
 if not os.environ.get("GROQ_API_KEY"):
 #   os.environ["OPENAI_API_KEY"] = os.getenv("OPENAI_API_KEY")
   os.environ["GROQ_API_KEY"] = os.getenv("GROQ_API_KEY")
+    # os.environ["ANTHROPIC_API_KEY"] = getpass.getpass("Enter API key for Anthropic: ")
 
 
 
@@ -35,8 +35,8 @@ User: Hello
 Your response: Yes, I'm here.
 3. Engage through reminiscence & open-ended questions
 4. Maintain empathy-first communication
-5. Encourage user to share stories by asking open-ended questions tied to his past:
-    "Pete, do you remember the first day you started working at the post office? What was it like stepping into that role?"
+5. Make stories by using information tied to his past:
+    "Pete, remember the first day you started working at the post office. How much fun was it going to your office on your first day remember you forgot to take your office bag that was a bummer you had to go back to your house to pick it up?"
 6. Leverage known personal details (family/hobbies/history)
      user infomation is: {user_info}
 7. Anchor discussions in familiar joys:
@@ -67,11 +67,12 @@ from langchain.chat_models import init_chat_model
 # Initialize the chat model
 # model = init_chat_model("gpt-3.5-turbo-0125", model_provider="openai")
 model = init_chat_model("llama-3.3-70b-versatile", model_provider="groq")
+# model = init_chat_model("claude-3-5-sonnet-latest", model_provider="anthropic")
 
 # Define the function that calls the model
 def call_model(state: MessagesState):
-    # response = model.invoke(state["messages"][-5:])    # Here i am sending jsut last 5 messages
-    response = model.invoke(state["messages"])
+    response = model.invoke(state["messages"][-5:])    # Here i am sending jsut last 5 messages
+    # response = model.invoke(state["messages"])
     return {"messages": [response]}
 
 

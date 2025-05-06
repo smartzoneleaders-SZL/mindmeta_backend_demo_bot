@@ -103,6 +103,13 @@ def check_me():
     return {"message":"Done"}
 
 
+
+async def send_interruption(websocket):
+    print("Intruption done")
+    await websocket.send_text("intruption")
+
+
+
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     logging.info("Entered")
@@ -116,11 +123,14 @@ async def websocket_endpoint(websocket: WebSocket):
         dg_connection = deepgram_client.listen.websocket.v("1")
 
         message_queue = asyncio.Queue()
+        loop = asyncio.get_event_loop()
 
         def on_message(self, result, **kwargs):
             sentence = result.channel.alternatives[0].transcript.strip()
             if not (result.speech_final and sentence):
                 return
+            # send a message to frontend to stop  the current media (this way we can acheive that intruption thing)
+            asyncio.run_coroutine_threadsafe(send_interruption(websocket), loop)
 
             nonlocal last_message
             old_last = last_message
