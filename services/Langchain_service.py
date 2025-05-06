@@ -12,7 +12,7 @@ from langgraph.graph import START, MessagesState, StateGraph
 load_dotenv()
 
 
-user_info ="Pete Hillman , a 78-year-old retired postmaster from Bristol, UK, who is living with early-stage dementia in a care home. Pete has two sons name 'jake' and 'jack' and a daughter name 'margurete' "
+user_info ="Pete Hillman , a 78-year-old retired postmaster from Bristol, UK, who is living with early-stage dementia in a care home. Pete has two sons name 'jake' and 'jack' and a daughter name 'margurete'. Pete like to listen to colbie caillat. "
 
 
 
@@ -29,11 +29,9 @@ if not os.environ.get("OPENAI_API_KEY"):
 
 chat_prompt = ChatPromptTemplate.from_messages([
     ("system", f"""You're Pete's compassionate dementia companion.Your name is 'Elys' you were created my 'mindmeta engineers' Use memory to:
-1. Don't introduce yourself more than once. don't say ' i am elys' with every single respone just one time is enough.
-1. Greet Pete only once at the start of the conversation using 'Hey [patient name]' or 'Hello [patient name]'.
-2. If Pete says 'Hello' or 'Hi' again later in the chat, do NOT greet him again. Instead, acknowledge with a simple reassurance, like:
-User: Hello
-Your response: Yes, I'm here.
+1. Don't say 'Hello' or 'Hi' or other word simply talk with the user
+2. If Pete says 'Hello [user name]' or 'Hi' or similar words  in the chat, do NOT greet him assume taht you have already greeted the user which you have. If user however still says "hello" or "hi" simply say:
+Your response: Yes, I'm here shall we continue our talk.
 3. Your Responses should be a bit short but if needed they can be of normal size.
 4. Maintain empathy-first communication
 5. Make stories by using information tied to his past:
@@ -99,7 +97,22 @@ chat_with_model = workflow.compile(checkpointer=memory)
 
 
 
+from datetime import datetime
 
+async def greet_user(name):
+
+    messages = [
+    SystemMessage("Greet user like 'good morning how is your day going' or 'good afternoon  how is my favarite person doing today' based on the time."),
+    HumanMessage(f"user name is : {name} and time right now is: {datetime.now().strftime('%I:%M %p')}"),]
+
+    return model.invoke(messages)
+
+
+
+
+
+
+# Not using this right now as we don't want to use two voices
 from langchain_core.messages import HumanMessage, SystemMessage
 from utils.utils import parse_boolean_from_response 
 if not os.environ.get("ANTHROPIC_API_KEY"):

@@ -6,7 +6,7 @@ from deepgram import DeepgramClient, LiveTranscriptionEvents, LiveOptions, Deepg
 
 import os
 from dotenv import load_dotenv
-from services.Langchain_service import chat_with_model, are_sentences_related
+from services.Langchain_service import chat_with_model, greet_user
 import logging
 # For extracting history
 from services.after_call_ends import get_chat_hisory
@@ -116,55 +116,37 @@ async def send_interruption(websocket):
 
 
 
+
+
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
-    logging.info("Entered")
+    print("Entered")
+    
     dg_connection = None
     await websocket.accept()
     try:
         send_task = None
         new_chat_id = uuid.uuid1()
-        last_message = " "
         
         dg_connection = deepgram_client.listen.websocket.v("1")
 
         message_queue = asyncio.Queue()
+        
+        
+        greetings  = await greet_user("Pete Hillman")
+        text_to_speech(greetings.content, message_queue)
+        
+        
         loop = asyncio.get_event_loop()
 
         def on_message(self, result, **kwargs):
-            sentence = result.channel.alternatives[0].transcript.strip()
-            if not (result.speech_final and sentence):
-                return
-            # send a message to frontend to stop  the current media (this way we can acheive that intruption thing)
-            asyncio.run_coroutine_threadsafe(send_interruption(websocket), loop)
-
-            nonlocal last_message
-            old_last = last_message
-
-            # Submit both tasks at once
-            future_llm     = _executor.submit(invoke_model, sentence, new_chat_id)
-            future_related = _executor.submit(are_sentences_related, old_last, sentence)
-
-            # Wait for both to complete
-            wait([future_llm, future_related])
-
-            # Pull results
-            llm_response = future_llm.result()
-            is_related   = future_related.result()
-
-            if is_related:
-                # If they're part of the same sentence
-                last_message = f"{old_last} {sentence}"
-                logging.info(f"merged sentences and speaking. {last_message}")
-                speak_merged = invoke_model(last_message, new_chat_id)
-                logging.info(f"Response from llm is: {speak_merged} ")
-                text_to_speech(speak_merged, message_queue)
-            else:
-                # Otherwise treat it as a standalone sentence & speak immediately
-                last_message = sentence
-                logging.info(f"New sentence, speaking now. the sentence is: {last_message} ")
-                logging.info(f"Response from llm is: {llm_response} ")
+            sentence = result.channel.alternatives[0].transcript
+            if result.speech_final and sentence.strip():
+                logging.info(f"Received sentence: {sentence}")
+                asyncio.run_coroutine_threadsafe(send_interruption(websocket), loop)
+                llm_response = invoke_model(sentence,new_chat_id)  
                 text_to_speech(llm_response, message_queue)
+
                 
 
 
@@ -181,7 +163,9 @@ async def websocket_endpoint(websocket: WebSocket):
         options = LiveOptions(
             model="nova-3",
             smart_format=True,
+            interim_results=True,
             language="en",
+            endpointing=700
         )
 
         if dg_connection.start(options) is False:
@@ -210,7 +194,7 @@ async def websocket_endpoint(websocket: WebSocket):
                 break
 
     except Exception as e:
-        logging.error(f"WebSocket error: {e}")
+        print(f"WebSocket error: {e}")
     finally:
         if dg_connection is not None:
             dg_connection.finish()
@@ -219,7 +203,7 @@ async def websocket_endpoint(websocket: WebSocket):
     try:
         await websocket.close()
     except RuntimeError:
-        logging.error("WebSocket already closed.")
+        print("WebSocket already closed.")
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
