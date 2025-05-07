@@ -144,6 +144,7 @@ async def websocket_endpoint(websocket: WebSocket):
                 logging.info(f"Received sentence: {sentence}")
                 asyncio.run_coroutine_threadsafe(send_interruption(websocket), loop)
                 llm_response = invoke_model(sentence,new_chat_id)  
+                logging.info(f"Model respose is: {llm_response}")
                 text_to_speech(llm_response, message_queue)
 
                 
@@ -163,8 +164,7 @@ async def websocket_endpoint(websocket: WebSocket):
             model="nova-3",
             smart_format=True,
             interim_results=True,
-            language="en",
-            endpointing=700
+            language="en"
         )
 
         if dg_connection.start(options) is False:
@@ -183,8 +183,10 @@ async def websocket_endpoint(websocket: WebSocket):
             try:
 
                 data = await websocket.receive_bytes()
+                print(f"Received {len(data)} bytes")
 
                 dg_connection.send(data)
+                
             except WebSocketDisconnect as e:
                 print("Error on websocket is: ",str(e))
                 
@@ -193,7 +195,7 @@ async def websocket_endpoint(websocket: WebSocket):
                 break
 
     except Exception as e:
-        print(f"WebSocket error: {e}")
+        logging.error(f"WebSocket error: {e}")
     finally:
         if dg_connection is not None:
             dg_connection.finish()
@@ -202,7 +204,7 @@ async def websocket_endpoint(websocket: WebSocket):
     try:
         await websocket.close()
     except RuntimeError:
-        print("WebSocket already closed.")
+        logging.error("WebSocket already closed.")
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
