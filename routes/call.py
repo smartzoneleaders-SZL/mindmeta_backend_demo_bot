@@ -1,4 +1,5 @@
 from fastapi import APIRouter
+from fastapi.responses import JSONResponse
 
 
 # For call websocket
@@ -21,7 +22,15 @@ from services.after_call_ends import change_call_status_to_completed
 
 # For Prompt
 from services.preparing_prompt import prepare_prompt
-from services.before_call_start import get_voice_of_bot 
+
+# get-data-before-call
+from services.eleven_lab_services import eleven_labs_voices
+from services.postgres import get_time_from_schedule_call_using_patient_id, get_voice_from_db, get_first_name_of_patient
+
+# for db
+from fastapi import Depends
+from sqlalchemy.orm import Session
+from db.postgres import get_db
 
 
 
@@ -61,9 +70,29 @@ deepgram_client = DeepgramClient(api_key)
 
 
 
-
-# @router.get("/get-call-time")
-# def get_call_time(db: Session = Depends(get_db), schedule_id: str):
+# we have this separate endpoint to save time on websocket endpoint
+@router.get("/get-data-before-call")
+def get_call_time(schedule_id: str,patient_id: str, db: Session = Depends(get_db)):
+    """TO get 
+        -> Time duration of the cal.
+        -> To get patient_id againt a schedule_id (right now we aren't but in future if we need it cuz frontend alredy has patient_id)
+        -> Voice_id (of ELevenlabs) which the bot uses for this patient
+        -> User first name with which the bot greets the user"""
+    try:
+        call_time = get_time_from_schedule_call_using_patient_id(schedule_id)
+        voice = get_voice_from_db(patient_id)
+        voice_id = eleven_labs_voices.get(voice)
+        patient_first_name = get_first_name_of_patient(patient_id)
+        
+        
+        return JSONResponse(content={"call_time": call_time, "voice_id": voice_id, "patient_first_name": patient_first_name}, status_code=200)
+    
+        
+            
+    except Exception as e:
+        logger.exception("Error in get_call_time in routes/call.py/get-data-before-call -> ",str(e))
+        return JSONResponse(content={"details": "Error occured"}, status_code=500)    
+    
     
 
 
@@ -75,7 +104,7 @@ async def call_with_bot(websocket: WebSocket,
     try:
         
         prompt = prepare_prompt(patient_id)
-        voice_option = get_voice_of_bot(patient_id)
+        voice_option = get_voice_from_db(patient_id)
         
         send_task = None
         
@@ -164,7 +193,7 @@ async def call_with_bot(websocket: WebSocket,
 
     except Exception as e:
         logger.error(f"WebSocket error: {e}")
-        websocket.close
+        websocket.close()
     finally:
         if dg_connection is not None:
             dg_connection.finish()

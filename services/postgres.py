@@ -128,15 +128,13 @@ def get_time_from_schedule_call_using_patient_id(schedule_id):
     try:
         db= next(get_db())
         time = (db.query(ScheduledCall.call_duration).filter(ScheduledCall.id == schedule_id).first())
-        print("Time is: ", time)
         call_duration = time[0] if time else False
 
-        print("call duration is: ",call_duration)
         if call_duration:
             return call_duration
         else:
             print("Call duration is none that's what the db sent")
-            raise HTTPException(status_code=500, detail="Call duration is none")
+            raise HTTPException(status_code=500, detail="No call with this schedule id found")
     
     except Exception as e:
         print("Error on get_time_from_schedule_call_using_patient_id in postgres.py -> ",str(e))
@@ -337,4 +335,13 @@ def get_voice_from_db(patient_id):
     if user:
         return user.hume_voice
     else:
+        False
+        
+        
+def get_first_name_of_patient(patient_id):
+    db = next(get_db())
+    user = db.query(Patient).filter(Patient.id == patient_id).first()
+    if user:
+        return user.first_name
+    else:                
         False

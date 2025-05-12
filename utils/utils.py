@@ -1,6 +1,6 @@
 import re
 import logging
-
+import json
 import uuid
 
 def parse_boolean_from_response(response):
@@ -16,8 +16,14 @@ def parse_boolean_from_response(response):
     
     
 async def send_interruption(websocket):
-    logging.info("Intruption done")
-    await websocket.send_text("intruption")
+    logging.info("Interruption done")
+    
+    data = {
+        "type": "interruption",
+        "message": "Interruption triggered"
+    }
+
+    await websocket.send_text(json.dumps(data))
     
     
     
