@@ -1,55 +1,39 @@
-import requests  
-import base64
-import json
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
-from deepgram import DeepgramClient, LiveTranscriptionEvents, LiveOptions, DeepgramClientOptions
+from fastapi import FastAPI
 
-import os
-from dotenv import load_dotenv
-from services.Langchain_service import chat_with_model, greet_user
-import logging
-# For extracting history
-from services.after_call_ends import get_chat_hisory
-
-# For running main.py 
-import uvicorn
-
-# import uid for new chats
-import uuid 
-
-# from datetime
-from datetime import datetime
-
-# For eleven labs
-from services.eleven_lab_services import ElevenLabsService
-
-# From openai
-# from services.openai_service import system_prompt, client
-
-# For direct groq
-# from services.direct_langchain import client
-# from services.openai_service import main_prompt
 
 # For middleware
 from fastapi.middleware.cors import CORSMiddleware
 
+import logging
+import uvicorn
+
+# For routes
+from routes import call, demo_bot, analytics, auth, allow_access, cold_call
 
 
-import asyncio
-from concurrent.futures import ThreadPoolExecutor, wait
 
-# Reuse a single executor for all on_message calls
-_executor = ThreadPoolExecutor()
+
+
 
 
 
 
 # For azure logs
-logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler("app.log"),
+        logging.StreamHandler()  # For stdout, which Azure captures
+    ]
+)
+
+
+logger = logging.getLogger(__name__)
 
 
 
-load_dotenv()
+
 
 app = FastAPI()
 # Add CORS middleware
@@ -61,47 +45,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Initialize Deepgram client
-api_key = os.getenv("DEEPGRAM_API_KEY")
-if not api_key:
-    raise ValueError("Deepgram API Key is missing.")
-
-# config = DeepgramClientOptions(
-#             options={"keepalive": "true"}
-#         )
-deepgram_client = DeepgramClient(api_key)
-
-def invoke_model(input, chat_id):
-    input_data = {"messages": [{"role": "user", "content": input}]}
-    config = {"configurable": {"thread_id": chat_id}}
-    response = chat_with_model.invoke(input_data, config=config)
-    return response["messages"][-1].content
 
 
 
 
 
 
-def text_to_speech(text: str, message_queue) -> bytes:
-    """Convert text to speech using ElevenLabs API with latency optimization"""
-    try:
-        audio_data = ElevenLabsService.text_to_speech(
-            text=text, 
-            voice_id="gUbIduqGzBP438teh4ZA",  # Just for demo: Rachel voice
-            optimize_streaming_latency=4
-        )
 
-        # Encode audio bytes to base64 string
-        audio_base64 = base64.b64encode(audio_data).decode('utf-8')
-
-        # Send audio as base64 string in JSON
-        message = json.dumps({"audio": audio_base64, "complete": True})
-        message_queue.put_nowait(message)
-        
-        return True
-        
-    except Exception as e:
-        return text_to_speech("Oh sorry can you repeat?")
 
 @app.get("/")
 def check_me():
@@ -109,102 +59,20 @@ def check_me():
 
 
 
-async def send_interruption(websocket):
-    logging.info("Intruption done")
-    await websocket.send_text("intruption")
+
+app.include_router(call.router, prefix="/api/call", tags=["Talk to Bot"])
+app.include_router(demo_bot.router, prefix="/api/demo-bot-call", tags=["Talk to Demo Bot"])
 
 
 
+app.include_router(auth.router, prefix="/api/auth", tags=["AUTH"])
+app.include_router(allow_access.router, prefix="/api/allow-access", tags=["Allow Access"])
+
+app.include_router(analytics.router, prefix="/api/analytics", tags=["Analytics"])
+app.include_router(cold_call.router, prefix="/api/cold-call", tags=["Cold Call Script"])
 
 
-@app.websocket("/ws")
-async def websocket_endpoint(websocket: WebSocket):
-    print("Entered")
-    
-    dg_connection = None
-    await websocket.accept()
-    try:
-        send_task = None
-        new_chat_id = uuid.uuid1()
-        
-        dg_connection = deepgram_client.listen.websocket.v("1")
 
-        message_queue = asyncio.Queue()
-        
-        
-        greetings  = await greet_user("Pete Hillman")
-        text_to_speech(greetings.content, message_queue)
-        
-        
-        loop = asyncio.get_event_loop()
-
-        def on_message(self, result, **kwargs):
-            sentence = result.channel.alternatives[0].transcript
-            if result.speech_final and sentence.strip():
-                logging.info(f"Received sentence: {sentence}")
-                asyncio.run_coroutine_threadsafe(send_interruption(websocket), loop)
-                llm_response = invoke_model(sentence,new_chat_id)  
-                logging.info(f"Model respose is: {llm_response}")
-                text_to_speech(llm_response, message_queue)
-
-                
-
-
-        def on_error(self, error, **kwargs):
-            logging.error(f"Deepgram error: {error}")
-
-        def on_close(self, *args, **kwargs):  
-            logging.info("Deepgram connection closed")
-
-        dg_connection.on(LiveTranscriptionEvents.Transcript, on_message)
-        dg_connection.on(LiveTranscriptionEvents.Error, on_error)
-        dg_connection.on(LiveTranscriptionEvents.Close, on_close)
-
-        options = LiveOptions(
-            model="nova-3",
-            smart_format=True,
-            interim_results=True,
-            language="en"
-        )
-
-        if dg_connection.start(options) is False:
-            print("Failed to start connection")
-            return
-    
-
-        async def send_messages():
-            while True:
-                message = await message_queue.get()
-                await websocket.send_text(message)
-
-        send_task = asyncio.create_task(send_messages())
-
-        while True:
-            try:
-
-                data = await websocket.receive_bytes()
-                print(f"Received {len(data)} bytes")
-
-                dg_connection.send(data)
-                
-            except WebSocketDisconnect as e:
-                print("Error on websocket is: ",str(e))
-                
-                # printing all the history interaction 
-                get_chat_hisory(chat_with_model,new_chat_id)
-                break
-
-    except Exception as e:
-        logging.error(f"WebSocket error: {e}")
-    finally:
-        if dg_connection is not None:
-            dg_connection.finish()
-        if send_task is not None:
-            send_task.cancel()
-    try:
-        await websocket.close()
-    except RuntimeError:
-        logging.error("WebSocket already closed.")
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)

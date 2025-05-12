@@ -1,33 +1,40 @@
 import smtplib
-from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-# For env file
+from email.mime.multipart import MIMEMultipart
+
+
 import os
-from dotenv import load_dotenv
-load_dotenv()
 
-def send_email(receiver_email, subject, body):
+# Function to send email alert
+def send_email_alert(recipient_email,subject,body):
+    sender_email = os.getenv('EMAIL_SENDER')
+    sender_password = os.getenv('EMAIL_PASSWORD')
+
+    if not sender_email or not sender_password:
+        raise ValueError("Missing EMAIL_SENDER or EMAIL_PASSWORD in environment variables")
+    
+    if not recipient_email:
+        raise ValueError("Recipient email is missing or None")
+
+    print(f" Sending email from {sender_email} to {recipient_email}")  # Debugging
+
+    msg = MIMEMultipart()
+    msg["From"] = sender_email
+    msg["To"] = recipient_email
+    msg["Subject"] = subject
+    msg.attach(MIMEText(body, "plain"))
+
     try:
-        sender_email = "hello@notification.wheresit.ai"
-        sender_name = "Mind Meta.ai"
-
-        # Create a MIMEText email
-        msg = MIMEMultipart()
-        msg["From"] = f"{sender_name} <{sender_email}>"
-        msg["To"] = receiver_email  
-        msg["Subject"] = subject
-
-        # Add the plain-text body to the email
-        msg.attach(MIMEText(body, "plain"))
-
-        # Send the email
-        with smtplib.SMTP("live.smtp.mailtrap.io", 587) as server:
-            server.starttls()
-            server.login("api", "59a41c6480b9fe27a3f7510b892cd292")
-            # Note: Use `receiver_email` (plain address) here
-            server.sendmail(sender_email, receiver_email, msg.as_string())
-        
-        print(f"Email sent successfully to {receiver_email}")
+        server = smtplib.SMTP(os.getenv('SMTP_SERVER'), int(os.getenv('SMTP_PORT')))
+        server.ehlo()
+        server.starttls()
+        server.ehlo()
+        server.login(sender_email, sender_password)
+        server.sendmail(sender_email, recipient_email, msg.as_string())
+        server.quit()
+        print("✅ Email alert sent successfully.")
         return True
     except Exception as e:
-        return False
+        print(f"Error sending email: {e}")
+        raise
+

@@ -1,0 +1,177 @@
+from fastapi import APIRouter
+
+
+# For call websocket
+from fastapi import WebSocket, WebSocketDisconnect
+
+
+import json
+from fastapi import WebSocket, WebSocketDisconnect, Query
+from deepgram import DeepgramClient, LiveTranscriptionEvents, LiveOptions
+
+import os
+from dotenv import load_dotenv
+from services.Langchain_service import chat_with_model, greet_user, invoke_model
+import logging
+
+# For extracting history
+from services.after_call_ends import get_chat_hisory
+from services.after_call_ends import change_call_status_to_completed
+
+
+# For Prompt
+from services.preparing_prompt import prepare_prompt
+from services.before_call_start import get_voice_of_bot 
+
+
+
+# import uid for new chats
+import uuid 
+
+
+
+# For TTS (text to speech)
+from utils.eleven_labs_utils import text_to_speech
+
+# for sending intruptions
+from utils.utils import send_interruption
+
+import asyncio
+
+
+
+router = APIRouter()
+
+load_dotenv()
+
+logger = logging.getLogger(__name__)
+
+
+
+
+# Initialize Deepgram client
+api_key = os.getenv("DEEPGRAM_API_KEY")
+if not api_key:
+    raise ValueError("Deepgram API Key is missing.")
+
+# config = DeepgramClientOptions(
+#             options={"keepalive": "true"}
+#         )
+deepgram_client = DeepgramClient(api_key)
+
+
+
+
+# @router.get("/get-call-time")
+# def get_call_time(db: Session = Depends(get_db), schedule_id: str):
+    
+
+
+@router.websocket("/call-with-bot")
+async def call_with_bot(websocket: WebSocket, 
+    patient_id: str = Query(...)):
+    await websocket.accept()
+
+    try:
+        
+        prompt = prepare_prompt(patient_id)
+        voice_option = get_voice_of_bot(patient_id)
+        
+        send_task = None
+        
+        new_chat_id = uuid.uuid1()
+        
+        dg_connection = deepgram_client.listen.websocket.v("1")
+
+        message_queue = asyncio.Queue()
+        
+        
+        greetings  = await greet_user("Pete Hillman")
+        audio = text_to_speech(greetings.content, voice_option)
+        
+        # Send audio as base64 string in JSON
+        message = json.dumps({"audio": audio, "complete": True})
+        message_queue.put_nowait(message)
+        
+        
+        loop = asyncio.get_event_loop()
+
+        def on_message(self, result, **kwargs):
+            sentence = result.channel.alternatives[0].transcript
+            if result.speech_final and sentence.strip():
+                logger.info(f"Received sentence: {sentence}")
+                asyncio.run_coroutine_threadsafe(send_interruption(websocket), loop)
+                llm_response = invoke_model(sentence,new_chat_id, prompt)  
+                logger.info(f"Model respose is: {llm_response}")
+                audio = text_to_speech(llm_response, voice_option)
+                
+                # Send audio as base64 string in JSON
+                message = json.dumps({"audio": audio, "complete": True})
+                message_queue.put_nowait(message)
+
+                
+
+
+        def on_error(self, error, **kwargs):
+            logger.error(f"Deepgram error: {error}")
+            raise RuntimeError(f"Error occurred on Deepgram: {str(error)}")
+
+
+        def on_close(self, *args, **kwargs):  
+            logger.info("Deepgram connection closed")
+            raise RuntimeError("Connection closed")
+
+
+        dg_connection.on(LiveTranscriptionEvents.Transcript, on_message)
+        dg_connection.on(LiveTranscriptionEvents.Error, on_error)
+        dg_connection.on(LiveTranscriptionEvents.Close, on_close)
+
+        options = LiveOptions(
+            model="nova-3",
+            smart_format=True,
+            interim_results=True,
+            language="en"
+        )
+
+        if dg_connection.start(options) is False:
+            logger.error("Failed to start connection")
+            raise RuntimeError("Failed to start connection")
+    
+
+        async def send_messages():
+            while True:
+                message = await message_queue.get()
+                await websocket.send_text(message)
+
+        send_task = asyncio.create_task(send_messages())
+
+        while True:
+            try:
+
+                data = await websocket.receive_bytes()
+
+                dg_connection.send(data)
+                
+            except WebSocketDisconnect as e:
+                logger.exception("Error on websocket is: ",str(e))
+                
+                
+                chat_history = get_chat_hisory(chat_with_model,new_chat_id)
+                did_change = change_call_status_to_completed(patient_id)
+                if did_change:
+                    logger.info("Call status changed to completed")
+                break
+
+    except Exception as e:
+        logger.error(f"WebSocket error: {e}")
+        websocket.close
+    finally:
+        if dg_connection is not None:
+            dg_connection.finish()
+        if send_task is not None:
+            send_task.cancel()
+    try:
+        await websocket.close()
+    except RuntimeError:
+        logger.error("WebSocket already closed.")
+

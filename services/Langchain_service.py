@@ -2,7 +2,7 @@ from langchain_groq import ChatGroq
 import getpass
 import os
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
-from langchain.schema import HumanMessage
+from langchain_core.messages import HumanMessage, SystemMessage
 
 from dotenv import load_dotenv
 # For memory
@@ -16,14 +16,13 @@ user_info ="Pete Hillman , a 78-year-old retired postmaster from Bristol, UK, wh
 
 
 
-# # Initialize the model
+
 
 
 
 if not os.environ.get("OPENAI_API_KEY"):
   os.environ["OPENAI_API_KEY"] = os.getenv("OPENAI_API_KEY")
-#   os.environ["GROQ_API_KEY"] = os.getenv("GROQ_API_KEY")
-    # os.environ["ANTHROPIC_API_KEY"] = os.getenv("ANTHROPIC_API_KEY")
+
 
 
 
@@ -55,43 +54,75 @@ Start warmly, end reassuringly. Keep responses natural and focused on verified i
 
 
 
+
+
+
+
 from langgraph.checkpoint.memory import MemorySaver
 
 
 # langchain_essentials.py
 
 from langchain.chat_models import init_chat_model
+from langchain.schema import BaseMessage
+from typing import TypedDict, List
 
 
-# Initialize the chat model
+class ChatState(TypedDict):
+    input: str
+    messages: List[BaseMessage]
+
+
 model = init_chat_model("gpt-3.5-turbo-0125", model_provider="openai")
-# model = init_chat_model("llama-3.3-70b-versatile", model_provider="groq")
+# model = init_chat_model("llama3-8b-8192", model_provider="groq")
 # model = init_chat_model("claude-3-5-sonnet-latest", model_provider="anthropic")
 
-# Define the function that calls the model
-def call_model(state: MessagesState):
-    response = model.invoke(state["messages"][-5:])    # Here i am sending jsut last 5 messages
-    # response = model.invoke(state["messages"])
+
+
+def generate_chat_prompt(state: ChatState, config):
+    tpl: ChatPromptTemplate = config["configurable"]["prompt_template"]
+    state["messages"] = tpl.format_messages(user_input=state["input"])
+    return state
+
+
+def call_model(state: ChatState, config):
+    response = model.invoke(state["messages"][-5:])
     return {"messages": [response]}
 
 
-# Define a node function for generating the prompt
-def generate_chat_prompt(state: MessagesState):
-    state["messages"] = chat_prompt.format_messages(messages=[])
-    return state
-
-# Now define your workflow:
-workflow = StateGraph(state_schema=MessagesState)
+workflow = StateGraph(state_schema=ChatState)
 workflow.add_node("chat_prompt", generate_chat_prompt)
 workflow.add_node("model", call_model)
-
-# Define edges to establish the flow:
 workflow.add_edge(START, "chat_prompt")
 workflow.add_edge("chat_prompt", "model")
 
 memory = MemorySaver()
-# Compile the workflow with the memory checkpointer
 chat_with_model = workflow.compile(checkpointer=memory)
+
+
+
+
+
+
+
+from langchain.prompts.chat import ChatPromptTemplate, SystemMessagePromptTemplate, HumanMessagePromptTemplate
+def invoke_model(user_text: str, chat_id: str, prompt_template: str):
+    # Build prompt template dynamically
+    dynamic_tpl = ChatPromptTemplate.from_messages([
+        SystemMessagePromptTemplate.from_template(prompt_template),
+        HumanMessagePromptTemplate.from_template("{user_input}")
+    ])
+
+    input_data = {"input": user_text}
+    config = {
+        "configurable": {
+            "thread_id": chat_id,
+            "prompt_template": dynamic_tpl
+        }
+    }
+
+    result = chat_with_model.invoke(input_data, config=config)
+    return result["messages"][-1].content
 
 
 
@@ -112,31 +143,7 @@ async def greet_user(name):
 
 
 
-# Not using this right now as we don't want to use two voices
-from langchain_core.messages import HumanMessage, SystemMessage
-from utils.utils import parse_boolean_from_response 
-if not os.environ.get("ANTHROPIC_API_KEY"):
-#   os.environ["OPENAI_API_KEY"] = os.getenv("OPENAI_API_KEY")
-#   os.environ["GROQ_API_KEY"] = os.getenv("GROQ_API_KEY")
-    os.environ["ANTHROPIC_API_KEY"] = os.getenv("ANTHROPIC_API_KEY")
 
-model_anthropic = init_chat_model("claude-3-5-sonnet-latest", model_provider="anthropic")
-
-def are_sentences_related(first, second):
-    messages = [
-    SystemMessage( "Decide whether the two provided fragments could naturally combine to form a single coherent sentence. "
-    "For example, 'my name' and 'is Jake' together form 'My name is Jake' — return 'True'. "
-    "If they do not combine into a grammatically correct sentence, return 'False'. "
-    "Only respond with 'True' or 'False'. No explanation."
-        ),
-    HumanMessage(f"first sentence: {first}, second sentence {second}"),]
-    
-    model_response =  model_anthropic.invoke(messages)
-
-    parser = parse_boolean_from_response(model_response.content)
-    print("Response from parser is: ",parser)
-    return parser
-    
 
 
 
