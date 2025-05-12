@@ -51,7 +51,7 @@ async def upload_chat_hisory(patient_id ,call_id, messages):
         - history in langhchain object which contains role, token amount, message etc 
     """
     try:
-        is_done = check_chat_for_possible_word(messages,patient_id)
+        # is_done = check_chat_for_possible_word(messages,patient_id)
         # dict_chat=list_to_dict(messages)
         # human_messages = get_human_messages_out_of_call_chat(dict_chat)
         sentiment_analysis = check_sentiment_using_textblob(messages)

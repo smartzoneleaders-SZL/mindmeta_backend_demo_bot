@@ -2,3 +2,5 @@ venv
 services/__pycache__
 utils/__pycache__
 .env
+app.log
+db/__pycache__
