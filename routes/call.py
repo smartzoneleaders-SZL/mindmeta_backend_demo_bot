@@ -98,13 +98,16 @@ def get_call_time(schedule_id: str,patient_id: str, db: Session = Depends(get_db
 
 @router.websocket("/call-with-bot")
 async def call_with_bot(websocket: WebSocket, 
-    patient_id: str = Query(...)):
+    patient_id: str = Query(...),
+    voice_id: str = Query(...),
+    patient_name: str = Query(...)
+    ):
     await websocket.accept()
 
     try:
         
         prompt = prepare_prompt(patient_id)
-        voice_option = get_voice_from_db(patient_id)
+
         
         send_task = None
         
@@ -115,8 +118,8 @@ async def call_with_bot(websocket: WebSocket,
         message_queue = asyncio.Queue()
         
         
-        greetings  = await greet_user("Pete Hillman")
-        audio = text_to_speech(greetings.content, voice_option)
+        greetings  = await greet_user(patient_name)
+        audio = text_to_speech(greetings.content, voice_id)
         
         # Send audio as base64 string in JSON
         message = json.dumps({"audio": audio, "complete": True})
@@ -132,7 +135,7 @@ async def call_with_bot(websocket: WebSocket,
                 asyncio.run_coroutine_threadsafe(send_interruption(websocket), loop)
                 llm_response = invoke_model(sentence,new_chat_id, prompt)  
                 logger.info(f"Model respose is: {llm_response}")
-                audio = text_to_speech(llm_response, voice_option)
+                audio = text_to_speech(llm_response, voice_id)
                 
                 # Send audio as base64 string in JSON
                 message = json.dumps({"audio": audio, "complete": True})

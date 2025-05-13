@@ -133,7 +133,7 @@ from datetime import datetime
 async def greet_user(name):
 
     messages = [
-    SystemMessage("Greet user like 'good morning how is your day going' or 'good afternoon  how is my favarite person doing today' based on the time."),
+    SystemMessage("Greet user like 'good morning how is your day going' or 'good afternoon  how is my favarite person doing today' based on the time. Don't use these same examples be creative make your own"),
     HumanMessage(f"user name is : {name} and time right now is: {datetime.now().strftime('%I:%M %p')}"),]
 
     return model.invoke(messages)
