@@ -11,6 +11,9 @@ from sqlalchemy.orm import Session
 
 from model.demo_history import DemoHistory
 
+import logging
+logger = logging.getLogger(__name__)    
+
 def all_users_with_time_analytics(db: Session):
     """
     Fetches all demo users with their name, email, and total time spent.
@@ -50,7 +53,7 @@ def all_users_with_time_analytics(db: Session):
         return result
     
     except Exception as e:
-        print(f"Error in all_users_with_time_analytics: {str(e)}")
+        logger.exception(f"Error in all_users_with_time_analytics: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
     
 def never_used_percentage(db: Session):
@@ -106,7 +109,7 @@ def never_used_percentage(db: Session):
         return {"percentage": percentage, "users": users_list}
     
     except Exception as e:
-        print(f"Error in never_used_percentage: {str(e)}")
+        logger.exception(f"Error in never_used_percentage: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
     
 def all_users_not_accessed_by_admin(db: Session):
@@ -147,7 +150,7 @@ def all_users_not_accessed_by_admin(db: Session):
         return result
     
     except Exception as e:
-        print(f"Error in all_users_not_accessed_by_admin: {str(e)}")
+        logger.exception(f"Error in all_users_not_accessed_by_admin: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
 def percentage_of_not_accessed_by_admin_users(db: Session):
@@ -167,7 +170,7 @@ def percentage_of_not_accessed_by_admin_users(db: Session):
         return percentage
     
     except Exception as e:
-        print(f"Error in percentage_of_not_activated_users: {str(e)}")
+        logger.exception(f"Error in percentage_of_not_activated_users: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
     
 # check percentage of users registered back after their 30 minutes usage (having email in both demo_history and demo_access)
@@ -212,7 +215,7 @@ def percentage_of_users_came_back_after_30_minutes_usage(db: Session):
         
         return {"percentage": percentage, "users": users_list}
     except Exception as e:
-        print(f"Error in percentage_of_users_came_back_after_30_minutes_usage: {str(e)}")
+        logger.exception(f"Error in percentage_of_users_came_back_after_30_minutes_usage: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
 def people_never_registered_back_after_first_usage(db: Session):
@@ -242,7 +245,6 @@ def people_never_registered_back_after_first_usage(db: Session):
             .filter(~DemoHistory.email.in_(db.query(DemoAccess.email)))
             .all()
         )
-        print("USers are: ", users_never_registered)
         emails_used_once_not_registered = len(users_never_registered)
         
         # Prevent division by zero
@@ -258,6 +260,6 @@ def people_never_registered_back_after_first_usage(db: Session):
         return {"percentage": percentage, "users": users_list}
     
     except Exception as e:
-        print(f"Error in people_never_registered_back_after_first_usage: {str(e)}")
+        logger.exception(f"Error in people_never_registered_back_after_first_usage: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 

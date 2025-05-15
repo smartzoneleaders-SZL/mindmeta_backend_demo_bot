@@ -39,7 +39,6 @@ def get_cold_call_script(db: Session = Depends(get_db)):
     """To get cold call script from the db"""
     try:
         script = db.query(ColdCall).filter(ColdCall.id == 1).first()
-        print("data is: ",script.cold_call_message)
         if script:
             return JSONResponse(status_code=200, content={"cold_call_script": script.cold_call_message})
         else:

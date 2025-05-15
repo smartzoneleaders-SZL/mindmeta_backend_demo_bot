@@ -4,6 +4,9 @@ import json
 import base64
 import os
 
+import logging
+logger = logging.getLogger(__name__)
+
 cipher = Fernet(os.getenv('SECRET_KEY'))
 
 def generate_token(name: str, email: str, phone_number: str):
@@ -18,7 +21,7 @@ def decode_token(token: str):
         decrypted_data = cipher.decrypt(encrypted).decode()
         return json.loads(decrypted_data)
     except (ValueError, TypeError, json.JSONDecodeError) as e:
-        print(f"Decoding failed: {e}")
+        logger.error(f"Decoding failed: {e}")
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Invalid token: {e}")
 

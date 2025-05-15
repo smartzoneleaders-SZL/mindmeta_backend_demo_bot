@@ -8,7 +8,6 @@ client_text = OpenAI(api_key=os.getenv('OPENAI_API_KEY'), base_url="https://api.
 # Function to check messages for self-harm or harm intent
 def detect_harmful_line(message):
     try:
-        print("API Key in use: ", os.getenv('OPENAI_API_KEY'))
         response = client_text.chat.completions.create(
             model="gpt-3.5-turbo-0125",
             messages=[

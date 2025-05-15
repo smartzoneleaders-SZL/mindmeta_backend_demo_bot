@@ -25,6 +25,11 @@ from fastapi import Depends
 from sqlalchemy.orm import Session
 from db.postgres import get_db
 
+
+import logging
+
+logger = logging.getLogger(__name__)
+
 router = APIRouter()
 
 @router.post("/register-for-access")
@@ -35,7 +40,6 @@ def register_for_access(request: RegisterAccess):
         if user:
             return JSONResponse(content={"request_sent": False, "detail": "User already exist"},status_code=409)
         did_create = create_new_demo_access(request.email,request.name,request.phone_number)
-        print("did_create: ",did_create)
         if did_create:
             encoded_data = generate_token(request.name, request.email, request.phone_number)
             access_link = f"{os.getenv('BACKEND_LINK')}/api/allow-access/allow-demo-access/{encoded_data}"
@@ -53,7 +57,7 @@ def register_for_access(request: RegisterAccess):
             return JSONResponse(content={"detail": "Error while creating user in DB"}, status_code=500)
     except Exception as e:
         
-        print("Error Is: ",str(e))
+        logger.exception(f"Error Is: {str(e)}")
         return JSONResponse(content={"detail": "An Error occured"}, status_code= 500)
 
 
@@ -78,5 +82,5 @@ def login(request: LoginRequest, db: Session = Depends(get_db)):
         # Extract details and status code from the HTTPException.
         return JSONResponse(content={"detail": http_exc.detail}, status_code=http_exc.status_code)
     except Exception as e:
-        print("Error on /login endpoint: ", str(e))
+        logger.exception(f"Error on /login endpoint: {str(e)}")
         return JSONResponse(content={"detail": "An Error has occurred"}, status_code=500)

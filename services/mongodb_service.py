@@ -16,22 +16,14 @@ logger = logging.getLogger(__name__)
 
 async def upload_chat_history_on_mongodb(patient_id: str, call_id: str, new_chats: list, carehome_id: str, sentiment):
     try:
-       
-        new_chats.insert(0, {"user_sentiment": sentiment})
-
-        # Validate structure
-        if not new_chats or "user_sentiment" not in new_chats[0]:
-            raise ValueError("new_chats must start with a 'user_sentiment' entry.")
-
-        sentiment = new_chats[0]["user_sentiment"]
-        conversation = new_chats[1:]
+        logger.info(f"Conversation is: {new_chats}")
 
         # Create the call entry
         call_entry = {
-            "call_id": Binary(base64.b64decode(call_id), subtype=4),
+            "call_id": Binary(call_id.bytes, subtype=4),
             "call_time": datetime.now(timezone.utc),
             "sentiment_analysis": sentiment,
-            "conversation": conversation
+            "conversation": new_chats
         }
 
         # Match document by patient ID
@@ -111,7 +103,6 @@ async def upload_on_mongodb(patient_id: str, call_id: str, data_to_upload: dict)
         logger.info("Document updated for patient_id: %s with call_id: %s", patient_id, call_id)
         return result.modified_count
     except Exception as e:
-        print("Error in mongodb service is: ", str(e))
         logger.error("Error in upload_on_mongodb: %s", str(e))
         raise
 

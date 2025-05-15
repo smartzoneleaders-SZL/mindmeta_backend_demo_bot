@@ -16,7 +16,6 @@ from services.Langchain_service import chat_with_model, greet_user, invoke_model
 import logging
 
 # For extracting history
-from services.Langchain_service import get_chat_history
 from services.after_call_ends import change_call_status_to_completed
 
 # for sentiment analysis
@@ -99,7 +98,7 @@ def get_call_time(schedule_id: str,patient_id: str, db: Session = Depends(get_db
         raise he 
         
     except Exception as e:
-        logger.exception("Error in get_call_time in routes/call.py/get-data-before-call -> ",str(e))
+        logger.exception(f"Error in get_call_time in routes/call.py/get-data-before-call -> str(e)")
         return JSONResponse(content={"details": "Error occured"}, status_code=500)    
     
     
@@ -118,10 +117,12 @@ async def call_with_bot(websocket: WebSocket,
         
         prompt = prepare_prompt(patient_id)
 
-        
+        chat_history = []       
+
         send_task = None
         
         new_chat_id = uuid.uuid1()
+        
         
         dg_connection = deepgram_client.listen.websocket.v("1")
 
@@ -141,10 +142,11 @@ async def call_with_bot(websocket: WebSocket,
         def on_message(self, result, **kwargs):
             sentence = result.channel.alternatives[0].transcript
             if result.speech_final and sentence.strip():
-                logger.info(f"Received sentence: {sentence}")
                 asyncio.run_coroutine_threadsafe(send_interruption(websocket), loop)
-                llm_response = invoke_model(sentence,new_chat_id, prompt)  
-                logger.info(f"Model respose is: {llm_response}")
+
+                llm_response = invoke_model(sentence,new_chat_id, prompt) 
+
+                chat_history.append({"user_query": sentence, "bot": llm_response}) 
                 audio = text_to_speech(llm_response, voice_id)
                 
                 # Send audio as base64 string in JSON
@@ -192,30 +194,32 @@ async def call_with_bot(websocket: WebSocket,
 
                 data = await websocket.receive_bytes()
 
+
                 dg_connection.send(data)
                 
             except WebSocketDisconnect as e:
-                logger.exception("Error on websocket is: ",str(e))
-                
-                
-                chat_history = get_chat_history(chat_with_model,new_chat_id)
-                sentiment = check_sentiment_using_textblob(chat_history)
-                did_upload = await upload_chat_history_on_mongodb(patient_id, new_chat_id, chat_history, carehome_id, sentiment)
-                did_change = change_call_status_to_completed(patient_id)
-                if did_change:
-                    logger.info("Call status changed to completed")
+                logger.exception(f"websocket disconnected")
                 break
 
     except Exception as e:
         logger.error(f"WebSocket error: {e}")
-        websocket.close()
+        await websocket.close(code=1000, reason="normal closer")
     finally:
-        if dg_connection is not None:
-            dg_connection.finish()
-        if send_task is not None:
-            send_task.cancel()
+            logger.info(f"Chat history is: {chat_history}")
+            sentiment = check_sentiment_using_textblob(chat_history)
+            did_upload = await upload_chat_history_on_mongodb(patient_id, new_chat_id, chat_history, carehome_id, sentiment)
+            did_change = change_call_status_to_completed(patient_id)
+            if did_change:
+                logger.info("Call status changed to completed")
+
+
+
+            if dg_connection is not None:
+                dg_connection.finish()
+            if send_task is not None:
+                send_task.cancel()
     try:
-        await websocket.close()
+        await websocket.close(code=1000, reason="normal closer")
     except RuntimeError:
         logger.error("WebSocket already closed.")
 

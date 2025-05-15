@@ -1,5 +1,4 @@
-import json
-import base64
+from fastapi import HTTPException
 
 def send_audio_from_local(audio_file_path):
     try:
@@ -9,4 +8,4 @@ def send_audio_from_local(audio_file_path):
 
         return audio_bytes
     except Exception as e:
-        print("Error while sending audio from local directory:", e)
+        raise HTTPException(status_code=500, detail=f"Error reading audio file: {str(e)}")

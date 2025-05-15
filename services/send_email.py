@@ -2,6 +2,8 @@ import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
+from fastapi import HTTPException
+
 
 import os
 
@@ -16,7 +18,6 @@ def send_email_alert(recipient_email,subject,body):
     if not recipient_email:
         raise ValueError("Recipient email is missing or None")
 
-    print(f" Sending email from {sender_email} to {recipient_email}")  # Debugging
 
     msg = MIMEMultipart()
     msg["From"] = sender_email
@@ -32,9 +33,7 @@ def send_email_alert(recipient_email,subject,body):
         server.login(sender_email, sender_password)
         server.sendmail(sender_email, recipient_email, msg.as_string())
         server.quit()
-        print("✅ Email alert sent successfully.")
         return True
     except Exception as e:
-        print(f"Error sending email: {e}")
-        raise
+        raise HTTPException(status_code=500, detail=f"Failed to send email: {str(e)}")
 

@@ -16,12 +16,15 @@ from services.send_email import send_email_alert
 
 router = APIRouter()
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 @router.get("/allow-demo-access/{encoded_data}")
 def allow_demo_access(encoded_data: str):
     """Check if the token is authentic and allow access to the user also when we allow user the access we send him/her an email"""
     try:
         decoded = decode_token(encoded_data)
-        print(decoded['email'])
         if decoded['allow_access']:
             did_upload = grant_access_by_email(decoded["email"])
             if did_upload:
@@ -37,7 +40,7 @@ def allow_demo_access(encoded_data: str):
         else: 
             return JSONResponse(content={"status": False, "detail": "Bad Link"}, status_code=400) 
     except Exception as e:
-        print("Error: ",str(e))
+        logger.exception(f"Error: {str(e)}")
         return JSONResponse(content={"details": "Error occured"}, status_code=500)
     
 
@@ -59,5 +62,5 @@ async def give_access_to_user(email: str):
     except HTTPException as http_exc:
         return JSONResponse(content={"status": False, "detail": http_exc.detail}, status_code=http_exc.status_code)
     except Exception as e:
-        print(f"Error in give_access_to_user: {str(e)}")
+        logger.exception(f"Error in give_access_to_user: {str(e)}")
         return JSONResponse(content={"status": False, "detail": "An unexpected error occurred"}, status_code=500)

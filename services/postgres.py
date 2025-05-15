@@ -34,7 +34,7 @@ def get_carehome_id_from_patient_id(patient_id: str) -> str:
         patient = db.query(Patient).filter(Patient.id == patient_id).first()
         return patient.carehome_id if patient else None
     except Exception as e: 
-        print("Error in postgres.py in services: ",str(e))
+        logger.exception(f"Error in postgres.py in services: {str(e)}")
         raise
 
 
@@ -52,11 +52,10 @@ def get_patient_medical_summary_from_patient_id(patient_id :str) ->str:
     try:
         db =next(get_db()) 
         patient_medical_history_summary = db.query(Summary).filter(Summary.patient_id == patient_id).first()
-        print("Patient medical history summary is: ",patient_medical_history_summary.content)
         return patient_medical_history_summary.content if patient_medical_history_summary else None
     except Exception as e:
-        print("Error in get_patient_summary_from_patient_id function inside postgres in services -> ",str(e))
-        raise
+        logger.exception(f"Error in get_patient_summary_from_patient_id function inside postgres in services -> {str(e)}")
+        raise HTTPException(status_code=500, detail="Error in db")
 
 
 def get_patient_life_history(patient_id:str) -> str:
@@ -69,14 +68,13 @@ def get_patient_life_history(patient_id:str) -> str:
     try:
         db = next(get_db()) 
         patient_life_history = db.query(LifeHistory).filter(LifeHistory.patient_id == patient_id).first()
-        # print("Patient life history added by the family is: ",patient_life_history.history)
         if(patient_life_history is None):
             return False
         return patient_life_history.history if patient_life_history else None
     
     except Exception as e:
-        print("Error in get_patient_life_history function inside postgres in services -> ",str(e))
-        raise
+        logger.exception(f"Error in get_patient_life_history function inside postgres in services -> {str(e)}")
+        raise HTTPException(status_code=500, detail="Error in db")
 
 
 def get_current_call_title_description(patient_id: str) ->str:
@@ -92,10 +90,10 @@ def get_current_call_title_description(patient_id: str) ->str:
 
         if what_to_talk is None:
             return " ", " "
-        # print("What to talk about in the call: ",what_to_talk.title, " and its description is: ",what_to_talk.description)
+    
         return what_to_talk.title, what_to_talk.description
     except Exception as e:
-        print("Error in get_current_call_title_description inside postgres in services -> ",str(e))
+        logger.exception(f"Error in get_current_call_title_description inside postgres in services -> {str(e)}")
         raise      
 
 
@@ -113,15 +111,12 @@ def did_change_status_to_completed(patient_id:str)->str:
         status_change = db.query(ScheduledCall).filter(
                         ScheduledCall.patient_id == patient_id,
                         ScheduledCall.status == "scheduled").update({"status": "completed"}, synchronize_session=False)
-        if status_change != 1:
-            print('Critical error')
-            print(status_change)
             
         db.commit()
         return True
     except Exception as e:
-        print("Error in postgres while changing status -> ",str(e))
-        raise
+        logger.exception(f"Error in postgres while changing status -> {str(e)}")
+        raise HTTPException(status_code=500, detail="Error in db")
 
 
 def get_time_from_schedule_call_using_patient_id(schedule_id):
@@ -154,10 +149,10 @@ def get_carehome_email(patient_id):
     try:
         db = next(get_db())
         carehome_email = db.query(CareHome.email) .join(Patient, CareHome.id == Patient.carehome_id).filter(Patient.id == patient_id).scalar()
-        print("carehome email is: ",carehome_email)
         return carehome_email
     except Exception as e:
-        print("Error while getiitng carehome email in -> get_carehome_email function in postgres",str(e))
+        logger.exception(f"Error while getiitng carehome email in -> get_carehome_email function in postgres {str(e)}")
+        raise HTTPException(status_code=500, detail="Error in db")
     
 
 
@@ -173,7 +168,7 @@ def create_new_demo_access(email, name, phone_number):
         db.commit()
         return True
     except Exception as e:
-        print("Error on database is: ",str(e))
+        logger.exception(f"Error on create_new_demo_access is: {str(e)}")
         raise HTTPException(status_code=500, detail="Error while creating user")
 
 def validate_user(user_email: str):
@@ -195,7 +190,7 @@ def validate_user(user_email: str):
         # Propagate HTTPException without modification.
         raise he
     except Exception as e:
-        print("Error in postgres services: ", str(e))
+        logger.exception(f"Error in postgres services:  {str(e)}")
         raise HTTPException(status_code=500, detail="Error in db")
     
 
@@ -215,7 +210,7 @@ def does_user_exist(email: str):
             return True
         
     except Exception as e:
-        print("Error in does user exist: ",str(e))
+        logger.exception(f"Error in does user exist: {str(e)}")
         raise HTTPException(status_code=500,detail={"details": "Error while checking if user already exist"})
     
 
@@ -276,7 +271,7 @@ def is_user_eligible_for_call(db, email: str):
     except HTTPException as hp:
         raise hp  #
     except Exception as e:
-        print("Error in eligibility is: ",str(e))
+        logger.exception(f"Error in eligibility is: {str(e)}")
         raise HTTPException(status_code=500, detail="An Error has occured while checking eligibility")
 
 def delete_user_from_db(email: str):
@@ -287,7 +282,7 @@ def delete_user_from_db(email: str):
         db.commit()
         return True
     except Exception as e:
-        print("Error in deleting user from db: ",str(e))
+        logger.exception(f"Error in deleting user from db: {str(e)}")
         raise HTTPException(status_code=500, detail="An Error has occured while deleting user from db")
 
 def add_demo_history(email: str, name: str, phone_number: str):
@@ -299,7 +294,7 @@ def add_demo_history(email: str, name: str, phone_number: str):
         db.commit()
         return True
     except Exception as e:
-        print("Error in adding demo history: ",str(e))
+        logger.exception(f"Error in adding demo history: {str(e)}")
         raise HTTPException(status_code=500, detail="An Error has occured while adding demo history")
 
 # Service to give access to user
@@ -314,7 +309,7 @@ def give_access_to_user_by_admin(email: str):
         db.refresh(user)
         return True
     except Exception as e:
-        print("Error in giving access to user by admin: ",str(e))
+        logger.exception(f"Error in giving access to user by admin: {str(e)}")
         raise HTTPException(status_code=500, detail="An Error has occured while giving access to user by admin")
     
 

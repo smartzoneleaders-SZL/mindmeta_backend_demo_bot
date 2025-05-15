@@ -3,6 +3,10 @@ from fastapi import FastAPI, HTTPException
 import asyncio
 from services.opensips_ws_lib import OpenSIPSClient
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 app = FastAPI()
 
@@ -38,7 +42,7 @@ async def call_user(patient_id):
         result = await client.place_call(dummy_number, timeout=30)
         if result["success"]:
             call_id = result["call_id"]
-            print(f"Call answered: {call_id}")
+            logger.exception(f"Call answered: {call_id}")
 
             # Play an audio file 
             await client.play_audio_to_call(call_id, "./my_test_file.wav")

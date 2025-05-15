@@ -19,6 +19,10 @@ import socket
 import struct
 import random
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 class ElevenLabsStreamer:
     """
     Class for streaming ElevenLabs TTS audio to SIP calls
@@ -123,7 +127,7 @@ class ElevenLabsStreamer:
             self._process_audio_stream(audio_stream)
             
         except Exception as e:
-            print(f"Error in streaming worker: {e}")
+            logger.exception(f"Error in streaming worker: {e}")
             # Try to play a fallback message
             fallback_text = "Sorry, I encountered an issue while processing."
             try:
@@ -241,7 +245,7 @@ class ElevenLabsStreamer:
             # Small delay to control send rate
             time.sleep(0.020)  # 20ms typical for RTP packets
         except Exception as e:
-            print(f"Error sending RTP packet: {e}")
+            logger.exception(f"Error sending RTP packet: {e}")
     
     def stop_streaming(self):
         """Stop the audio streaming"""
@@ -299,5 +303,5 @@ async def stream_tts_to_call(client, call_id: str, text: str,
         
         return True
     except Exception as e:
-        print(f"Error streaming TTS to call: {e}")
+        logger.exception(f"Error streaming TTS to call: {e}")
         return False

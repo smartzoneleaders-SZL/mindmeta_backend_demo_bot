@@ -11,6 +11,10 @@ from fastapi import Depends
 from sqlalchemy.orm import Session
 from db.postgres import get_db
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 router = APIRouter()
 
 @router.get("/users-with-time")
@@ -33,7 +37,7 @@ def get_all_users_with_time(db: Session = Depends(get_db)):
             status_code=http_exc.status_code
         )
     except Exception as e:
-        print(f"Error in get_users_analytics: {str(e)}")
+        logger.exception(f"Error in get_users_analytics: {str(e)}")
         return JSONResponse(
             content={"status": False, "detail": "An unexpected error occurred"},
             status_code=500
@@ -59,7 +63,7 @@ def get_never_used_users_percentage(db: Session = Depends(get_db)):
             status_code=http_exc.status_code
         )
     except Exception as e:
-        print(f"Error in get_never_used_users: {str(e)}")
+        logger.exception(f"Error in get_never_used_users: {str(e)}")
         return JSONResponse(
             content={"status": False, "detail": "An unexpected error occurred"},
             status_code=500
@@ -82,7 +86,7 @@ def get_not_accessed_by_admin_users_percentage(db: Session = Depends(get_db)):
             status_code=http_exc.status_code
         )
     except Exception as e:
-        print(f"Error in get_not_activated_users: {str(e)}")
+        logger.exception(f"Error in get_not_activated_users: {str(e)}")
         return JSONResponse(
             content={"status": False, "detail": "An unexpected error occurred"},
             status_code=500
@@ -102,7 +106,7 @@ def get_all_users_not_accessed_by_admin(db: Session = Depends(get_db)):
             status_code=http_exc.status_code
         )
     except Exception as e:
-        print(f"Error in get_all_users_not_accessed_by_admin: {str(e)}")
+        logger.exception(f"Error in get_all_users_not_accessed_by_admin: {str(e)}")
         return JSONResponse(
             content={"status": False, "detail": "An unexpected error occurred"},
             status_code=500
@@ -122,7 +126,7 @@ def percentage_of_users_registered_back_after_30_minutes_usage(db: Session = Dep
             status_code=http_exc.status_code
         )
     except Exception as e:
-        print(f"Error in get_users_registered_back_after_30_minutes_usage: {str(e)}")
+        logger.exception(f"Error in get_users_registered_back_after_30_minutes_usage: {str(e)}")
         return JSONResponse(content={"status": False, "detail": "An unexpected error occurred"}, status_code=500)
     
 @router.get("/never-registered-back-after-first-usage")
@@ -136,6 +140,6 @@ def percentage_of_people_never_registered_back_after_first_usage(db: Session = D
     except HTTPException as http_exc:
         return JSONResponse(content={"status": False, "detail": http_exc.detail}, status_code=http_exc.status_code)
     except Exception as e:
-        print(f"Error in count_of_people_never_registered_back_after_first_usage: {str(e)}")
+        logger.exception(f"Error in count_of_people_never_registered_back_after_first_usage: {str(e)}")
         return JSONResponse(content={"status": False, "detail": "An unexpected error occurred"}, status_code=500)
     

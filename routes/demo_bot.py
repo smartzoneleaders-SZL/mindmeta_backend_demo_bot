@@ -162,7 +162,7 @@ async def call_with_bot(
         )
 
         if dg_connection.start(options) is False:
-            print("Failed to start connection")
+            logger.exception("Failed to start connection")
             return
     
 

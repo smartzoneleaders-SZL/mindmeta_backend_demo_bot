@@ -1,17 +1,17 @@
 # importing required functions to query postgresql
 from services.postgres import get_patient_life_history, get_patient_medical_summary_from_patient_id, get_current_call_title_description
+from fastapi import HTTPException
+import logging
 
+logger = logging.getLogger(__name__)
 
 def prepare_prompt(patient_id):
     """We will pass patient id to functions that will query the postgreq db.
     The data we get, we will prepare starting prompt with that."""
     try:
         life_history = get_patient_life_history(patient_id)
-        print("Life history is: ", life_history)
         medical_summary = get_patient_medical_summary_from_patient_id(patient_id)
-        print("Medical history is: ",medical_summary)
         title, description= get_current_call_title_description(patient_id)
-        print("Title is: ", title, " description is: ", description)
         if medical_summary is None:
             return " "
         
@@ -28,11 +28,11 @@ def prepare_prompt(patient_id):
       10. If user becomes confused or disengaged, gently redirect the conversation:
           "That’s okay, Let’s talk about something else."
       11. Use only verified information."""
-        # print("Final prompt is: ",instruction)
+
         return instruction
     except Exception as e:
-        print("Error in preparing_prompt.py -> ",str(e))
-        raise
+        logger.exception(f"Error in preparing_prompt.py -> {str(e)}")
+        raise HTTPException(status_code=500, detail="An Error has occured while preparing prompt")
     
 
 
