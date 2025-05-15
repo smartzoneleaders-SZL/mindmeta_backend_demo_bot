@@ -1,9 +1,7 @@
 
 import asyncio
 import logging
-import sys
-import os
-import time
+
 
 
 
@@ -83,6 +81,8 @@ async def voice_bot_demo(args):
             
             # Wait for user response (simulated)
             logger.info("Waiting for user response...")
+
+
             await asyncio.sleep(5)  # In a real system, you'd use speech recognition here
         
         # End streaming

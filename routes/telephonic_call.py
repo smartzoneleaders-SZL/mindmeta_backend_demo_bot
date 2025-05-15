@@ -37,7 +37,7 @@ async def call_on_telephone(request: TelephonicCall, db: Session = Depends(get_d
         patient_first_name = get_first_name_of_patient(patient_id)
         carehome_id = get_carehome_id_from_patient_id(patient_id)
 
-        # Step 2: Prepare args for the voice bot
+        # args for the voice bot
         def create_args():
             parser = argparse.ArgumentParser()
             parser.add_argument('--server')
