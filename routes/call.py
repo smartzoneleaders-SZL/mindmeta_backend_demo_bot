@@ -1,4 +1,4 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from fastapi.responses import JSONResponse
 
 
@@ -16,8 +16,11 @@ from services.Langchain_service import chat_with_model, greet_user, invoke_model
 import logging
 
 # For extracting history
-from services.after_call_ends import get_chat_hisory
+from services.Langchain_service import get_chat_history
 from services.after_call_ends import change_call_status_to_completed
+
+# for sentiment analysis
+from services.sentiment_analysis import check_sentiment_using_textblob
 
 
 # For Prompt
@@ -25,12 +28,15 @@ from services.preparing_prompt import prepare_prompt
 
 # get-data-before-call
 from services.eleven_lab_services import eleven_labs_voices
-from services.postgres import get_time_from_schedule_call_using_patient_id, get_voice_from_db, get_first_name_of_patient
+from services.postgres import get_time_from_schedule_call_using_patient_id, get_voice_from_db, get_first_name_of_patient, get_carehome_id_from_patient_id
 
 # for db
 from fastapi import Depends
 from sqlalchemy.orm import Session
 from db.postgres import get_db
+
+# For uploading on mongodb
+from services.mongodb_service import upload_chat_history_on_mongodb
 
 
 
@@ -83,12 +89,15 @@ def get_call_time(schedule_id: str,patient_id: str, db: Session = Depends(get_db
         voice = get_voice_from_db(patient_id)
         voice_id = eleven_labs_voices.get(voice)
         patient_first_name = get_first_name_of_patient(patient_id)
+        carehome_id = get_carehome_id_from_patient_id(patient_id)
         
         
-        return JSONResponse(content={"call_time": call_time, "voice_id": voice_id, "patient_first_name": patient_first_name}, status_code=200)
+        return JSONResponse(content={"call_time": call_time, "voice_id": voice_id, "patient_first_name": patient_first_name, "carehome_id": carehome_id}, status_code=200)
     
         
-            
+    except HTTPException as he: 
+        raise he 
+        
     except Exception as e:
         logger.exception("Error in get_call_time in routes/call.py/get-data-before-call -> ",str(e))
         return JSONResponse(content={"details": "Error occured"}, status_code=500)    
@@ -100,7 +109,8 @@ def get_call_time(schedule_id: str,patient_id: str, db: Session = Depends(get_db
 async def call_with_bot(websocket: WebSocket, 
     patient_id: str = Query(...),
     voice_id: str = Query(...),
-    patient_name: str = Query(...)
+    patient_name: str = Query(...),
+    carehome_id: str = Query(...)
     ):
     await websocket.accept()
 
@@ -188,7 +198,9 @@ async def call_with_bot(websocket: WebSocket,
                 logger.exception("Error on websocket is: ",str(e))
                 
                 
-                chat_history = get_chat_hisory(chat_with_model,new_chat_id)
+                chat_history = get_chat_history(chat_with_model,new_chat_id)
+                sentiment = check_sentiment_using_textblob(chat_history)
+                did_upload = upload_chat_history_on_mongodb(patient_id, new_chat_id, chat_history, carehome_id, sentiment)
                 did_change = change_call_status_to_completed(patient_id)
                 if did_change:
                     logger.info("Call status changed to completed")

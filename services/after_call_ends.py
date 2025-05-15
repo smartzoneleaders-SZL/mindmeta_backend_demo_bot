@@ -167,18 +167,3 @@ def check_chat_for_possible_word(messages, patient_id):
     return True
     
     
-
-
-    
-
-
-
-def get_chat_hisory(chat_with_model,call_id):
-    try:
-        config = {"configurable": {"thread_id": call_id}}
-        state_snapshot = chat_with_model.get_state(config)
-        logger.info("History is: ",state_snapshot.values["messages"])
-        return state_snapshot
-    except Exception as e:
-        return False
-    

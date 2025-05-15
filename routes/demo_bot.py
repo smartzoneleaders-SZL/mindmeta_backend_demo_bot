@@ -15,8 +15,7 @@ from dotenv import load_dotenv
 from services.Langchain_service import chat_with_model, greet_user, invoke_model
 import logging
 
-# For extracting history
-from services.after_call_ends import get_chat_hisory
+
 
 
 

@@ -15,3 +15,8 @@ class ShouldAllowCall(BaseModel):
 class CallEndDemo(BaseModel):
     time:int
     email: str
+
+
+
+class TelephonicCall(BaseModel):
+    schedule_id: str

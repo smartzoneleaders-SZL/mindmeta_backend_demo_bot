@@ -1,5 +1,5 @@
 from langchain_groq import ChatGroq
-import getpass
+
 import os
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.messages import HumanMessage, SystemMessage
@@ -81,13 +81,17 @@ model = init_chat_model("gpt-3.5-turbo-0125", model_provider="openai")
 
 def generate_chat_prompt(state: ChatState, config):
     tpl: ChatPromptTemplate = config["configurable"]["prompt_template"]
-    state["messages"] = tpl.format_messages(user_input=state["input"])
-    return state
-
+    user_msg = tpl.format_messages(user_input=state["input"])
+    
+    # Append prompt messages to history
+    messages = state.get("messages", []) + user_msg
+    return {"input": state["input"], "messages": messages}
 
 def call_model(state: ChatState, config):
-    response = model.invoke(state["messages"][-5:])
-    return {"messages": [response]}
+    messages = state.get("messages", [])
+    response = model.invoke(messages[-5:]) 
+    messages.append(response)
+    return {"input": state["input"], "messages": messages}
 
 
 workflow = StateGraph(state_schema=ChatState)
@@ -137,6 +141,40 @@ async def greet_user(name):
     HumanMessage(f"user name is : {name} and time right now is: {datetime.now().strftime('%I:%M %p')}"),]
 
     return model.invoke(messages)
+
+
+
+
+
+
+# Get langchain chat history
+from langchain_core.messages import AIMessage
+
+def get_chat_history(chat_with_model, call_id):
+    try:
+        config = {"configurable": {"thread_id": str(call_id)}}
+        state_snapshot = chat_with_model.get_state(config)
+        messages = state_snapshot.values.get("messages", [])
+
+        pairs = []
+        user_msg = None
+
+        for msg in messages:
+            if isinstance(msg, HumanMessage):
+                user_msg = msg.content
+            elif isinstance(msg, AIMessage) and user_msg:
+                pairs.append({
+                    "user_query": user_msg,
+                    "ai_response": msg.content
+                })
+                user_msg = None  
+
+        return pairs
+
+    except Exception as e:
+        print(f"Error: {e}")
+        return []
+
 
 
 

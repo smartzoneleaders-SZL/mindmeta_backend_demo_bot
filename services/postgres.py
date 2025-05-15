@@ -14,7 +14,8 @@ from db.postgres import get_db
 # To check the 48 hours access of demo user
 from datetime import datetime, timezone
 
-
+import logging 
+logger = logging.getLogger(__name__)
 
 
 
@@ -128,17 +129,22 @@ def get_time_from_schedule_call_using_patient_id(schedule_id):
     try:
         db= next(get_db())
         time = (db.query(ScheduledCall.call_duration).filter(ScheduledCall.id == schedule_id).first())
+        if time is None:
+            raise HTTPException(status_code=404, detail="No call with this schedule id found")
+        
         call_duration = time[0] if time else False
 
         if call_duration:
             return call_duration
         else:
-            print("Call duration is none that's what the db sent")
+            logger.error("Call duration is none that's what the db sent")
             raise HTTPException(status_code=500, detail="No call with this schedule id found")
-    
+        
+    except HTTPException as he:
+        raise he
     except Exception as e:
-        print("Error on get_time_from_schedule_call_using_patient_id in postgres.py -> ",str(e))
-        raise
+        logger.exception(f"Error on get_time_from_schedule_call_using_patient_id in postgres.py -> {str(e)}")
+        raise HTTPException(status_code=500, detail="Error in db")
 
 
 
@@ -332,6 +338,8 @@ def get_voice_from_db(patient_id):
     """To get voice from the db"""
     db = next(get_db())
     user = db.query(Patient).filter(Patient.id == patient_id).first()
+    if user is None:
+        raise HTTPException(status_code=404, detail="User with this user id not found")
     if user:
         return user.hume_voice
     else:
@@ -345,3 +353,13 @@ def get_first_name_of_patient(patient_id):
         return user.first_name
     else:                
         False
+
+
+def get_patient_id_from_schedule_id(db, schedule_id: str):
+    try:
+        scheduled_call = db.query(ScheduledCall).filter(ScheduledCall.id == schedule_id).first()
+        if scheduled_call is None:
+            return False  
+        return scheduled_call.patient_id
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="An error occurred while getting patient ID from schedule ID")

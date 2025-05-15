@@ -4,11 +4,10 @@ from fastapi import FastAPI
 # For middleware
 from fastapi.middleware.cors import CORSMiddleware
 
-import logging
 import uvicorn
 
 # For routes
-from routes import call, demo_bot, analytics, auth, allow_access, cold_call
+from routes import call, demo_bot, analytics, auth, allow_access, cold_call, telephonic_call
 
 
 
@@ -17,7 +16,7 @@ from routes import call, demo_bot, analytics, auth, allow_access, cold_call
 
 
 
-
+import logging
 # For azure logs
 logging.basicConfig(
     level=logging.INFO,
@@ -27,9 +26,14 @@ logging.basicConfig(
         logging.StreamHandler()  # For stdout, which Azure captures
     ]
 )
-
-
 logger = logging.getLogger(__name__)
+
+
+
+
+
+
+
 
 
 
@@ -62,6 +66,7 @@ def check_me():
 
 app.include_router(call.router, prefix="/api/call", tags=["Talk to Bot"])
 app.include_router(demo_bot.router, prefix="/api/demo-bot-call", tags=["Talk to Demo Bot"])
+app.include_router(telephonic_call.router, prefix="/api/telephonic-call", tags=["Telephonic Call"])
 
 
 
@@ -70,6 +75,7 @@ app.include_router(allow_access.router, prefix="/api/allow-access", tags=["Allow
 
 app.include_router(analytics.router, prefix="/api/analytics", tags=["Analytics"])
 app.include_router(cold_call.router, prefix="/api/cold-call", tags=["Cold Call Script"])
+
 
 
 
