@@ -200,7 +200,7 @@ async def call_with_bot(websocket: WebSocket,
                 
                 chat_history = get_chat_history(chat_with_model,new_chat_id)
                 sentiment = check_sentiment_using_textblob(chat_history)
-                did_upload = upload_chat_history_on_mongodb(patient_id, new_chat_id, chat_history, carehome_id, sentiment)
+                did_upload = await upload_chat_history_on_mongodb(patient_id, new_chat_id, chat_history, carehome_id, sentiment)
                 did_change = change_call_status_to_completed(patient_id)
                 if did_change:
                     logger.info("Call status changed to completed")
