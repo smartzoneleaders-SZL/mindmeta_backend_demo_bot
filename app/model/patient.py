@@ -30,5 +30,6 @@ class Patient(Base):
     hume_voice = Column(String)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+    phone_number = Column(String, nullable=False)
     # Relation
     carehome = relationship("CareHome", back_populates="patient")

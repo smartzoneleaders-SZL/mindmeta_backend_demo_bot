@@ -1,0 +1,16 @@
+websockets>=10.0
+pyaudio>=0.2.13
+elevenlabs>=0.2.26
+deepgram-sdk>=2.11.0
+numpy>=1.24.0
+pyyaml>=6.0
+
+[all]
+openai>=1.0.0
+groq>=0.4.0
+
+[groq]
+groq>=0.4.0
+
+[openai]
+openai>=1.0.0

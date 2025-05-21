@@ -1,0 +1,37 @@
+Metadata-Version: 2.4
+Name: opensipscall
+Version: 0.1.0
+Summary: OpenSIPS WebSocket Client with ElevenLabs TTS Integration
+Home-page: https://github.com/yourusername/opensipscall
+Author: Your Name
+Author-email: your.email@example.com
+Classifier: Programming Language :: Python :: 3
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Operating System :: OS Independent
+Requires-Python: >=3.8
+Description-Content-Type: text/markdown
+Requires-Dist: websockets>=10.0
+Requires-Dist: pyaudio>=0.2.13
+Requires-Dist: elevenlabs>=0.2.26
+Requires-Dist: deepgram-sdk>=2.11.0
+Requires-Dist: numpy>=1.24.0
+Requires-Dist: pyyaml>=6.0
+Provides-Extra: openai
+Requires-Dist: openai>=1.0.0; extra == "openai"
+Provides-Extra: groq
+Requires-Dist: groq>=0.4.0; extra == "groq"
+Provides-Extra: all
+Requires-Dist: openai>=1.0.0; extra == "all"
+Requires-Dist: groq>=0.4.0; extra == "all"
+Dynamic: author
+Dynamic: author-email
+Dynamic: classifier
+Dynamic: description
+Dynamic: description-content-type
+Dynamic: home-page
+Dynamic: provides-extra
+Dynamic: requires-dist
+Dynamic: requires-python
+Dynamic: summary
+
+# metamind_backend

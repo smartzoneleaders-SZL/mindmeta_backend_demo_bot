@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from sqlalchemy import Column, String, DateTime, ForeignKey, Integer
+from sqlalchemy import Column, String, DateTime, ForeignKey, Integer, Boolean
 from db.base import Base
 
 import uuid
@@ -19,5 +19,7 @@ class ScheduledCall(Base):
     status = Column(String, default="scheduled")  # can be 'scheduled', 'completed', 'failed'
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+    on_phone = Column(Boolean, default=False)
+    on_web = Column(Boolean, default=True)
     
     mongo_chat_id = Column(String, nullable=True,default=None) # New Column added By manan

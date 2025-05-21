@@ -270,34 +270,4 @@ class ElevenLabsStreamer:
         return True
 
 # Function to use in place of your original text_to_speech
-async def stream_tts_to_call(client, call_id: str, text: str, 
-                           voice_id: str = "gUbIduqGzBP438teh4ZA",
-                           optimize_streaming_latency: int = 4) -> bool:
-    """
-    Stream TTS audio directly to an active call
-    
-    Args:
-        client: OpenSIPSClient instance
-        call_id: ID of the active call
-        text: Text to convert to speech
-        voice_id: ElevenLabs voice ID
-        optimize_streaming_latency: Latency optimization level (0-4)
-        
-    Returns:
-        bool: Success status
-    """
-    try:
-        # Create streamer
-        streamer = ElevenLabsStreamer(client, call_id)
-        
-        # Stream audio
-        await streamer.stream_from_elevenlabs(
-            text=text,
-            voice_id=voice_id,
-            optimize_streaming_latency=optimize_streaming_latency
-        )
-        
-        return True
-    except Exception as e:
-        print(f"Error streaming TTS to call: {e}")
-        return False
+

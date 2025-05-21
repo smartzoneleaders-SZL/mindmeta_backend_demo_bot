@@ -131,12 +131,9 @@ async def call_with_bot(
         def on_message(self, result, **kwargs):
             sentence = result.channel.alternatives[0].transcript
             if result.speech_final and sentence.strip():
-                logger.info(f"Received sentence: {sentence}")
                 asyncio.run_coroutine_threadsafe(send_interruption(websocket), loop)
                 llm_response = invoke_model(sentence,new_chat_id,full_prompt)  
-                logger.info(f"Model respose is: {llm_response}")
                 audio = text_to_speech(llm_response, voice_id)
-                logger.info("Sending audio to frontend")
                 # Send audio as base64 string in JSON
                 message = json.dumps({"audio": audio, "complete": True})
                 message_queue.put_nowait(message)
@@ -188,7 +185,6 @@ async def call_with_bot(
         logger.error(f"WebSocket error: {str(e)}")
         # Send the error message to the WebSocket client
         await websocket.send_text(json.dumps({"error": str(e)}))
-        await websocket.close()
     finally:
         try:
             next(db_gen)  

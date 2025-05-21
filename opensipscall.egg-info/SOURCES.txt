@@ -1,0 +1,11 @@
+README.md
+setup.py
+lib/__init__.py
+lib/elevenlabs.py
+lib/opensip.py
+lib/utils/__init__.py
+opensipscall.egg-info/PKG-INFO
+opensipscall.egg-info/SOURCES.txt
+opensipscall.egg-info/dependency_links.txt
+opensipscall.egg-info/requires.txt
+opensipscall.egg-info/top_level.txt

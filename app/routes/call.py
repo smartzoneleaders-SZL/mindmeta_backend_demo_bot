@@ -106,13 +106,14 @@ def get_call_time(schedule_id: str,patient_id: str, db: Session = Depends(get_db
 
 
 @router.websocket("/call-with-bot")
-async def call_with_bot(websocket: WebSocket, 
-    patient_id: str = Query(...),
-    voice_id: str = Query(...),
-    patient_name: str = Query(...),
-    carehome_id: str = Query(...)
-    ):
+async def call_with_bot(websocket: WebSocket):
     await websocket.accept()
+    params  = websocket.query_params
+    patient_name = params.get("patient_name")
+    patient_id = params.get("patient_id")
+    voice_id = params.get("voice_id")
+    carehome_id = params.get("carehome_id")
+    logger.info("call started connection opened")
 
     try:
         
@@ -120,6 +121,7 @@ async def call_with_bot(websocket: WebSocket,
 
         
         send_task = None
+        chat_history = [] 
         
         new_chat_id = uuid.uuid1()
         
@@ -141,12 +143,10 @@ async def call_with_bot(websocket: WebSocket,
         def on_message(self, result, **kwargs):
             sentence = result.channel.alternatives[0].transcript
             if result.speech_final and sentence.strip():
-                logger.info(f"Received sentence: {sentence}")
                 asyncio.run_coroutine_threadsafe(send_interruption(websocket), loop)
                 llm_response = invoke_model(sentence,new_chat_id, prompt)  
-                logger.info(f"Model respose is: {llm_response}")
                 audio = text_to_speech(llm_response, voice_id)
-                
+                chat_history.append({"user_query": sentence, "bot": llm_response}) 
                 # Send audio as base64 string in JSON
                 message = json.dumps({"audio": audio, "complete": True})
                 message_queue.put_nowait(message)
@@ -195,10 +195,11 @@ async def call_with_bot(websocket: WebSocket,
                 dg_connection.send(data)
                 
             except WebSocketDisconnect as e:
-                logger.exception("Error on websocket is: ",str(e))
+                logger.exception(f"Error on websocket is: {str(e)}")
                 
                 
-                chat_history = get_chat_history(chat_with_model,new_chat_id)
+                # chat_history = get_chat_history(chat_with_model,str(new_chat_id))
+                print("Chat history is: ",chat_history)
                 sentiment = check_sentiment_using_textblob(chat_history)
                 did_upload = await upload_chat_history_on_mongodb(patient_id, new_chat_id, chat_history, carehome_id, sentiment)
                 did_change = change_call_status_to_completed(patient_id)
@@ -208,7 +209,6 @@ async def call_with_bot(websocket: WebSocket,
 
     except Exception as e:
         logger.error(f"WebSocket error: {e}")
-        websocket.close()
     finally:
         if dg_connection is not None:
             dg_connection.finish()

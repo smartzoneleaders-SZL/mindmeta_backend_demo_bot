@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 
 # For routes
-from routes import call, demo_bot, analytics, auth, allow_access, cold_call, telephonic_call
+from routes import call, demo_bot, analytics, auth, allow_access, cold_call, phone_call
 
 
 
@@ -59,14 +59,14 @@ app.add_middleware(
 
 @app.get("/")
 def check_me():
-    return {"message":"Done"}
+    return {"message":"Working fine v-1"}
 
 
 
 
 app.include_router(call.router, prefix="/api/call", tags=["Talk to Bot"])
 app.include_router(demo_bot.router, prefix="/api/demo-bot-call", tags=["Talk to Demo Bot"])
-app.include_router(telephonic_call.router, prefix="/api/telephonic-call", tags=["Telephonic Call"])
+app.include_router(phone_call.router, prefix="/api/telephonic-call", tags=["Telephonic Call"])
 
 
 
@@ -81,5 +81,5 @@ app.include_router(cold_call.router, prefix="/api/cold-call", tags=["Cold Call S
 
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=80)
 

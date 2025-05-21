@@ -363,3 +363,13 @@ def get_patient_id_from_schedule_id(db, schedule_id: str):
         return scheduled_call.patient_id
     except Exception as e:
         raise HTTPException(status_code=500, detail="An error occurred while getting patient ID from schedule ID")
+    
+    
+    
+
+def get_patient_phone_number(db, patient_id):
+    user = db.query(Patient).filter(Patient.id == patient_id).first()
+    if user:
+        return user.phone_number
+    else:                
+        False
